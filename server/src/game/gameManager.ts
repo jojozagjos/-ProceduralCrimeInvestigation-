@@ -247,6 +247,15 @@ export function applyBoardOp(lobbyId: string, op: BoardOp): BoardOp | undefined 
     case 'remove_connection':
       state.board.connections = state.board.connections.filter(c => c.id !== op.connectionId);
       break;
+    case 'add_tape':
+      if (!state.board.tapes) state.board.tapes = [];
+      state.board.tapes.push(op.tape);
+      break;
+    case 'remove_tape':
+      if (state.board.tapes) {
+        state.board.tapes = state.board.tapes.filter(t => t.id !== op.tapeId);
+      }
+      break;
     case 'lock_card': {
       const card = state.board.cards.find(c => c.id === op.cardId);
       if (card) card.lockedBy = op.playerId;

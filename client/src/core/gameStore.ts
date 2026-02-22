@@ -66,6 +66,13 @@ class GameStore {
         break;
       case 'add_connection': b.connections.push(op.connection); break;
       case 'remove_connection': b.connections = b.connections.filter(c => c.id !== op.connectionId); break;
+      case 'add_tape': 
+        if (!b.tapes) b.tapes = [];
+        b.tapes.push(op.tape);
+        break;
+      case 'remove_tape':
+        if (b.tapes) b.tapes = b.tapes.filter(t => t.id !== op.tapeId);
+        break;
       case 'lock_card': {
         const c = b.cards.find(c => c.id === op.cardId);
         if (c) c.lockedBy = op.playerId;

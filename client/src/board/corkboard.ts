@@ -5,13 +5,15 @@ import { gameStore } from '../core/gameStore.js';
 import { playSfx } from '../core/audioManager.js';
 import * as net from '../network/client.js';
 import { showToast } from '../ui/toast.js';
-import type { BoardCard, BoardConnection, BoardState, BoardOp, DrawingStroke, NoteTextItem, NoteImageItem } from '../utils/types.js';
+import type { BoardCard, BoardConnection, BoardState, BoardOp, DrawingStroke, NoteTextItem, NoteImageItem, BoardTape } from '../utils/types.js';
 
 let app: PIXI.Application | null = null;
 let boardContainer: PIXI.Container;
 let ropeGraphics: PIXI.Graphics;
 let pinOverlay: PIXI.Graphics;
+let tapeContainer: PIXI.Container;
 let cardSprites: Map<string, PIXI.Container> = new Map();
+let tapeSprites: Map<string, PIXI.Graphics> = new Map();
 let ropeSimulations: Map<string, VerletRope> = new Map();
 let isDragging = false;
 let dragTarget: PIXI.Container | null = null;
@@ -39,6 +41,18 @@ const cardPhysics = new Map<string, {
   isDeleting?: boolean;
   deleteStartTime?: number;
   pinPhysics?: { x: number; y: number; oldX: number; oldY: number; rotation: number; vr: number };
+}>();
+
+// Tape physics tracking
+const tapePhysics = new Map<string, {
+  x: number;
+  y: number;
+  oldX: number;
+  oldY: number;
+  rotation: number;
+  vr: number;
+  isDeleting?: boolean;
+  deleteStartTime?: number;
 }>();
 
 const HISTORY_LIMIT = 50;
@@ -289,6 +303,10 @@ export function renderCorkboard(container: HTMLElement): void {
   ropeGraphics = new PIXI.Graphics();
   ropeGraphics.zIndex = 200;
   boardContainer.addChild(ropeGraphics);
+  
+  tapeContainer = new PIXI.Container();
+  tapeContainer.zIndex = 5;
+  boardContainer.addChild(tapeContainer);
 
   pinOverlay = new PIXI.Graphics();
   pinOverlay.zIndex = 300;
@@ -332,7 +350,8 @@ export function renderCorkboard(container: HTMLElement): void {
   });
 
   canvas.addEventListener('mousemove', (e) => {
-    if (isPanning) {
+    // Don't pan if in delete mode or dragging items
+    if (isPanning && !deleteMode) {
       boardContainer.x = e.clientX - panStart.x;
       boardContainer.y = e.clientY - panStart.y;
     }
@@ -384,6 +403,7 @@ export function renderCorkboard(container: HTMLElement): void {
   toolbar.innerHTML = `
     <button class="btn btn-sm" id="btn-add-note" title="Add Note">📝 Note</button>
     <button class="btn btn-sm" id="btn-add-image-card" title="Add Image Card">🖼️ Image</button>
+    <button class="btn btn-sm" id="btn-add-tape" title="Add Tape">📎 Tape</button>
     <button class="btn btn-sm" id="btn-connect" title="Connect or Cut">🔗 Connect</button>
     <button class="btn btn-sm" id="btn-duplicate" title="Duplicate">📌 Duplicate</button>
     <button class="btn btn-sm" id="btn-delete" title="Delete Selected">🗑️ Delete</button>
@@ -443,6 +463,18 @@ export function renderCorkboard(container: HTMLElement): void {
         showToast('Invalid image URL.');
       });
     });
+  });
+
+  document.getElementById('btn-add-tape')!.addEventListener('click', () => {
+    const tape: BoardTape = {
+      id: 'tape_' + Math.random().toString(36).slice(2, 10),
+      x: 300 + Math.random() * 400,
+      y: 250 + Math.random() * 250,
+      rotation: (Math.random() - 0.5) * 30, // -15 to +15 degrees
+      color: Math.random() > 0.5 ? '#f5deb3' : '#ffffff', // tan or white
+    };
+    sendBoardOpWithHistory({ type: 'add_tape', tape });
+    playSfx('sfx_ui_click');
   });
 
   document.getElementById('btn-connect')!.addEventListener('click', () => {
@@ -614,6 +646,47 @@ export function renderCorkboard(container: HTMLElement): void {
       sprite.rotation = 0;
     }
     
+    // Update tape physics
+    for (const [tapeId, physics] of tapePhysics) {
+      const sprite = tapeSprites.get(tapeId);
+      if (!sprite) continue;
+      
+      // Deletion animation
+      if (physics.isDeleting && physics.deleteStartTime) {
+        const elapsed = performance.now() - physics.deleteStartTime;
+        const maxDuration = 4000;
+        
+        if (elapsed < maxDuration) {
+          const gravity = 0.4;
+          const airResistance = 0.98;
+          
+          const vx = (physics.x - physics.oldX) * airResistance;
+          const vy = (physics.y - physics.oldY) * airResistance;
+          
+          physics.oldX = physics.x;
+          physics.oldY = physics.y;
+          
+          physics.x += vx;
+          physics.y += vy + gravity;
+          
+          sprite.x = physics.x;
+          sprite.y = physics.y;
+          
+          // Subtle rotation as it falls
+          physics.vr += (Math.random() - 0.5) * 0.008;
+          physics.vr *= 0.98;
+          physics.rotation += physics.vr;
+          sprite.rotation = (physics.rotation * Math.PI) / 180;
+          
+          sprite.alpha = Math.max(0, 1 - elapsed / 3000);
+        } else {
+          tapeContainer.removeChild(sprite);
+          tapeSprites.delete(tapeId);
+          tapePhysics.delete(tapeId);
+        }
+      }
+    }
+    
     for (const [, rope] of ropeSimulations) {
       // Update pin positions from cards
       const fromCard = cardSprites.get(rope.fromCardId);
@@ -721,6 +794,86 @@ export function renderCorkboard(container: HTMLElement): void {
   });
 }
 
+function createTapeSprite(tape: BoardTape): void {
+  if (!app) return;
+  
+  const sprite = new PIXI.Graphics();
+  sprite.name = tape.id;
+  
+  // Draw tape piece - looks like masking tape
+  const color = tape.color ? parseInt(tape.color.replace('#', ''), 16) : 0xf5deb3;
+  sprite.beginFill(color, 0.7);
+  sprite.lineStyle(1, 0x000000, 0.1);
+  sprite.drawRoundedRect(-40, -8, 80, 16, 2);
+  sprite.endFill();
+  
+  // Add texture/pattern for realism
+  sprite.lineStyle(1, 0x000000, 0.05);
+  for (let i = -35; i < 40; i += 10) {
+    sprite.moveTo(i, -6);
+    sprite.lineTo(i, 6);
+  }
+  
+  sprite.x = tape.x;
+  sprite.y = tape.y;
+  sprite.rotation = (tape.rotation * Math.PI) / 180;
+  sprite.eventMode = 'static';
+  sprite.cursor = 'pointer';
+  
+  // Click to delete in delete mode
+  sprite.on('pointerdown', () => {
+    if (deleteMode) {
+      isDragging = false;
+      dragTarget = null;
+      
+      openModal('Delete Tape', `
+        <div class="form-row">
+          <p>Are you sure you want to delete this tape?</p>
+        </div>
+      `, 'Delete', (overlay) => {
+        isDragging = false;
+        dragTarget = null;
+        startTapeDeletion(tape.id);
+        overlay.remove();
+        deleteMode = false;
+        document.getElementById('btn-delete')?.classList.remove('active');
+      });
+    }
+  });
+  
+  tapeContainer.addChild(sprite);
+  tapeSprites.set(tape.id, sprite);
+  
+  // Initialize physics
+  tapePhysics.set(tape.id, {
+    x: tape.x,
+    y: tape.y,
+    oldX: tape.x,
+    oldY: tape.y,
+    rotation: tape.rotation,
+    vr: 0,
+  });
+}
+
+function startTapeDeletion(tapeId: string): void {
+  const physics = tapePhysics.get(tapeId);
+  const sprite = tapeSprites.get(tapeId);
+  if (!physics || !sprite) return;
+  
+  physics.isDeleting = true;
+  physics.deleteStartTime = performance.now();
+  physics.oldX = physics.x;
+  physics.oldY = physics.y;
+  physics.vr = (Math.random() - 0.5) * 0.03;
+  
+  // Send delete operation after animation
+  setTimeout(() => {
+    sendBoardOpWithHistory({ type: 'remove_tape', tapeId });
+  }, 4200);
+  
+  playSfx('sfx_ui_click');
+}
+
 function syncBoard(): void {
   const state = gameStore.getState();
   if (!state || !app) return;
@@ -783,6 +936,36 @@ function syncBoard(): void {
     const rope = ropeSimulations.get(id);
     if (rope && !rope.breaking) {
       startRopeBreak(rope);
+    }
+  }
+  
+  // Sync tapes
+  const existingTapes = new Set(tapeSprites.keys());
+  const tapes = board.tapes || [];
+  for (const tape of tapes) {
+    if (!tapeSprites.has(tape.id)) {
+      createTapeSprite(tape);
+    } else {
+      // Update position and rotation for non-deleting tapes
+      const sprite = tapeSprites.get(tape.id)!;
+      const physics = tapePhysics.get(tape.id);
+      if (!physics?.isDeleting) {
+        sprite.x = tape.x;
+        sprite.y = tape.y;
+        sprite.rotation = (tape.rotation * Math.PI) / 180;
+      }
+    }
+    existingTapes.delete(tape.id);
+  }
+  // Remove deleted tapes
+  for (const id of existingTapes) {
+    const sprite = tapeSprites.get(id);
+    const physics = tapePhysics.get(id);
+    // Don't remove if currently animating deletion
+    if (sprite && !physics?.isDeleting) {
+      tapeContainer.removeChild(sprite);
+      tapeSprites.delete(id);
+      tapePhysics.delete(id);
     }
   }
 }
@@ -947,23 +1130,13 @@ function createCardSprite(card: BoardCard): void {
         if (existing) {
           sendBoardOpWithHistory({ type: 'remove_connection', connectionId: existing.id });
         } else {
-          // Prompt for optional label
-          openModal('Connect Cards', `
-            <div class="form-row">
-              <input type="text" id="modal-connection-label" class="input" placeholder="Label (optional)" />
-            </div>
-          `, 'Connect', (overlay) => {
-            const input = overlay.querySelector('#modal-connection-label') as HTMLInputElement | null;
-            const label = input?.value.trim() || undefined;
-            const conn: BoardConnection = {
-              id: 'conn_' + Math.random().toString(36).slice(2, 10),
-              fromCardId: connectFromId!,
-              toCardId: card.id,
-              label,
-            };
-            sendBoardOpWithHistory({ type: 'add_connection', connection: conn });
-            overlay.remove();
-          });
+          // Create connection without label
+          const conn: BoardConnection = {
+            id: 'conn_' + Math.random().toString(36).slice(2, 10),
+            fromCardId: connectFromId!,
+            toCardId: card.id,
+          };
+          sendBoardOpWithHistory({ type: 'add_connection', connection: conn });
         }
         connectMode = false;
         connectFromId = null;

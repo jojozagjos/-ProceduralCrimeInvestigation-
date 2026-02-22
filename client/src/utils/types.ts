@@ -193,9 +193,18 @@ export interface BoardConnection {
   label?: string;
 }
 
+export interface BoardTape {
+  id: string;
+  x: number;
+  y: number;
+  rotation: number;
+  color?: string; // tan, white, clear, washi patterns
+}
+
 export interface BoardState {
   cards: BoardCard[];
   connections: BoardConnection[];
+  tapes?: BoardTape[];
 }
 
 export interface GameState {
@@ -224,6 +233,8 @@ export type BoardOp =
   | { type: 'remove_card'; cardId: string }
   | { type: 'add_connection'; connection: BoardConnection }
   | { type: 'remove_connection'; connectionId: string }
+  | { type: 'add_tape'; tape: BoardTape }
+  | { type: 'remove_tape'; tapeId: string }
   | { type: 'lock_card'; cardId: string; playerId: string }
   | { type: 'unlock_card'; cardId: string }
   | { type: 'draw_stroke'; cardId: string; stroke: DrawingStroke }
