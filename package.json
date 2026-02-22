@@ -1,0 +1,19 @@
+{
+  "name": "procedural-crime-investigation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dim-lit Private Investigator – 2D co-op procedural crime game",
+  "scripts": {
+    "dev:server": "cd server && npx tsx watch src/index.ts",
+    "dev:client": "cd client && npx vite",
+    "build:server": "cd server && npx tsc",
+    "build:client": "cd client && npx vite build",
+    "build:all": "npm run build:server && npm run build:client",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  }
+}

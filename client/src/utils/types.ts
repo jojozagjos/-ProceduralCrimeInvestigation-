@@ -1,0 +1,258 @@
+// ─── Client-side shared types (mirrors server types) ─────────────────────────
+// Re-exported for client usage without server dependency
+
+export type CaseType = 'random' | 'murder' | 'theft' | 'blackmail' | 'kidnapping' | 'arson';
+export const CASE_TYPES: CaseType[] = ['random', 'murder', 'theft', 'blackmail', 'kidnapping', 'arson'];
+
+export type Complexity = 'simple' | 'standard' | 'complex';
+export const COMPLEXITIES: Complexity[] = ['simple', 'standard', 'complex'];
+
+export type LobbyStatus = 'waiting' | 'in_game';
+export type TimePhase = 'evening' | 'late_night' | 'early_morning';
+export const TIME_PHASES: TimePhase[] = ['evening', 'late_night', 'early_morning'];
+
+export type EvidenceReliability = 'high' | 'medium' | 'low';
+export type EvidenceSourceType = 'forensic' | 'witness' | 'digital' | 'rumor';
+export type EvidenceTag = 'motive' | 'means' | 'opportunity' | 'alibi' | 'red_herring';
+
+export type InterviewCategory = 'alibi' | 'relationship' | 'conflicts' | 'financial' | 'whereabouts' | 'explain_evidence';
+
+export const INTERVIEW_CATEGORIES: { id: InterviewCategory; label: string }[] = [
+  { id: 'alibi', label: 'Alibi' },
+  { id: 'relationship', label: 'Relationship to victim' },
+  { id: 'conflicts', label: 'Recent conflicts' },
+  { id: 'financial', label: 'Financial motive' },
+  { id: 'whereabouts', label: 'Where were you at [time phase]?' },
+  { id: 'explain_evidence', label: 'Explain this evidence' },
+];
+
+export interface Player {
+  id: string;
+  displayName: string;
+  connected: boolean;
+}
+
+export interface LobbyInfo {
+  lobbyId: string;
+  hostDisplayName: string;
+  hostId: string;
+  playersCurrent: number;
+  playersMax: number;
+  status: LobbyStatus;
+  caseType: CaseType;
+  complexity: Complexity;
+  isPrivate: boolean;
+  privateCode?: string;
+  enableHints: boolean;
+  timeCompression: boolean;
+  customSeed?: string;
+  customCaseName?: string;
+  customVictimName?: string;
+  customSuspectNames?: string;
+  createdAt: number;
+  version: string;
+  players: Player[];
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: string;
+  senderName: string;
+  text: string;
+  system: boolean;
+  timestamp: number;
+}
+
+export interface Suspect {
+  id: string;
+  name: string;
+  age: number;
+  occupation: string;
+  relationship: string;
+  personality: string;
+  isGuilty: boolean;
+  alibi: string;
+  alibiPhase: TimePhase;
+  motive: string;
+  avatarUrl: string;
+}
+
+export interface Evidence {
+  id: string;
+  title: string;
+  description: string;
+  reliability: EvidenceReliability;
+  sourceType: EvidenceSourceType;
+  confidenceScore: number;
+  tag?: EvidenceTag;
+  discoveredBy?: string;
+  timePhase: TimePhase;
+  linkedSuspectId?: string;
+  isRedHerring: boolean;
+}
+
+export interface TimelineEvent {
+  id: string;
+  time: string;
+  phase: TimePhase;
+  description: string;
+  relatedSuspectIds: string[];
+  relatedEvidenceIds: string[];
+  discovered: boolean;
+  order: number;
+}
+
+export interface ClueChain {
+  id: string;
+  steps: Evidence[];
+  category: 'motive' | 'means' | 'opportunity';
+}
+
+export interface CaseData {
+  caseId: string;
+  seed: string;
+  caseName: string;
+  caseType: CaseType;
+  complexity: Complexity;
+  victimName: string;
+  victimAge: number;
+  victimOccupation: string;
+  location: string;
+  locationImageUrl: string;
+  synopsis: string;
+  suspects: Suspect[];
+  evidence: Evidence[];
+  timeline: TimelineEvent[];
+  clueChains: ClueChain[];
+  solution: {
+    culpritId: string;
+    motive: string;
+    method: string;
+    opportunity: string;
+  };
+  cinematicPanels: CinematicPanel[];
+}
+
+export interface CinematicPanel {
+  id: string;
+  imageDesc: string;
+  imageUrl?: string;
+  caption: string;
+  duration: number;
+}
+
+export interface NoteTextItem {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  w?: number;
+  h?: number;
+  size?: number;
+  color?: string;
+  rotation?: number;
+}
+
+export interface NoteImageItem {
+  id: string;
+  url: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotation?: number;
+}
+
+export interface BoardCard {
+  id: string;
+  type: 'evidence' | 'note' | 'testimony' | 'image';
+  title: string;
+  content: string;
+  imageUrl?: string;
+  noteColor?: string;
+  textItems?: NoteTextItem[];
+  imageItems?: NoteImageItem[];
+  x: number;
+  y: number;
+  tag?: EvidenceTag;
+  evidenceId?: string;
+  drawingStrokes?: DrawingStroke[];
+  lockedBy?: string;
+}
+
+export interface DrawingStroke {
+  points: { x: number; y: number }[];
+  color: string;
+  width: number;
+}
+
+export interface BoardConnection {
+  id: string;
+  fromCardId: string;
+  toCardId: string;
+  label?: string;
+}
+
+export interface BoardState {
+  cards: BoardCard[];
+  connections: BoardConnection[];
+}
+
+export interface GameState {
+  phase: 'cinematic' | 'investigation' | 'interview' | 'accusation' | 'results';
+  timePhase: TimePhase;
+  timePhaseIndex: number;
+  caseData: CaseData;
+  board: BoardState;
+  discoveredEvidenceIds: string[];
+  discoveredTimelineIds: string[];
+  interviewedSuspectIds: string[];
+  cinematicSkipVotes: string[];
+  currentInterviewSuspectId?: string;
+  interviewVotes: Record<string, boolean>;
+  interviewLog: { question: string; answer: string; category: InterviewCategory }[];
+  accusations: { playerId: string; suspectId: string; correct: boolean }[];
+  hintsUsed: number;
+  score: number;
+  startedAt: number;
+}
+
+export type BoardOp =
+  | { type: 'add_card'; card: BoardCard }
+  | { type: 'move_card'; cardId: string; x: number; y: number }
+  | { type: 'update_card'; cardId: string; content: string; title?: string; tag?: EvidenceTag; imageUrl?: string; noteColor?: string; textItems?: NoteTextItem[]; imageItems?: NoteImageItem[] }
+  | { type: 'remove_card'; cardId: string }
+  | { type: 'add_connection'; connection: BoardConnection }
+  | { type: 'remove_connection'; connectionId: string }
+  | { type: 'lock_card'; cardId: string; playerId: string }
+  | { type: 'unlock_card'; cardId: string }
+  | { type: 'draw_stroke'; cardId: string; stroke: DrawingStroke }
+  | { type: 'erase_strokes'; cardId: string }
+  | { type: 'undo' }
+  | { type: 'redo' };
+
+export type ServerMessage =
+  | { type: 'lobby:created'; data: { lobby: LobbyInfo } }
+  | { type: 'lobby:joined'; data: { lobby: LobbyInfo; playerId: string } }
+  | { type: 'lobby:updated'; data: { lobby: LobbyInfo } }
+  | { type: 'lobby:left'; data: { lobbyId: string } }
+  | { type: 'lobby:error'; data: { message: string } }
+  | { type: 'chat:message'; data: ChatMessage }
+  | { type: 'game:init'; data: { gameState: GameState } }
+  | { type: 'game:state'; data: { gameState: GameState } }
+  | { type: 'game:time_phase'; data: { phase: TimePhase; index: number } }
+  | { type: 'cinematic:vote_update'; data: { votes: string[]; total: number } }
+  | { type: 'cinematic:end' }
+  | { type: 'interview:requested'; data: { suspectId: string; requesterId: string; requesterName: string } }
+  | { type: 'interview:vote_update'; data: { votes: Record<string, boolean>; needed: number } }
+  | { type: 'interview:start'; data: { suspectId: string } }
+  | { type: 'interview:response'; data: { question: string; answer: string; category: InterviewCategory } }
+  | { type: 'interview:ended' }
+  | { type: 'timeline:updated'; data: { timeline: TimelineEvent[]; discoveredIds: string[] } }
+  | { type: 'board:updated'; data: { board: BoardState } }
+  | { type: 'board:op_applied'; data: { op: BoardOp } }
+  | { type: 'evidence:discovered'; data: { evidenceId: string; discoveredBy: string } }
+  | { type: 'accusation:result'; data: { playerId: string; correct: boolean; score: number } }
+  | { type: 'game:end'; data: { won: boolean; score: number; solution: GameState['caseData']['solution'] } }
+  | { type: 'error'; data: { message: string } }
+  | { type: 'pong' };
