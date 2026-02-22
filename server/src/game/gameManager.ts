@@ -1,6 +1,7 @@
 import seedrandom from 'seedrandom';
 import { generateCase, generateInterviewResponse } from '../case/caseGenerator.js';
 import { genId } from '../utils/helpers.js';
+import { getLobby } from '../lobby/lobbyManager.js';
 import type {
   GameState, LobbyInfo, BoardOp, BoardCard, BoardConnection,
   InterviewCategory, TimePhase, Evidence,
@@ -37,6 +38,8 @@ export function createGame(lobby: LobbyInfo): GameState {
     interviewVotes: {},
     interviewLog: [],
     accusations: [],
+    accusationVotes: {},
+    accusationSubmitted: false,
     hintsUsed: 0,
     score: 1000,
     startedAt: Date.now(),
@@ -251,11 +254,47 @@ export function applyBoardOp(lobbyId: string, op: BoardOp): BoardOp | undefined 
       if (!state.board.tapes) state.board.tapes = [];
       state.board.tapes.push(op.tape);
       break;
+    case 'move_tape':
+      if (state.board.tapes) {
+        const tape = state.board.tapes.find(t => t.id === op.tapeId);
+        if (tape) {
+          tape.x = op.x;
+          tape.y = op.y;
+        }
+      }
+      break;
     case 'remove_tape':
       if (state.board.tapes) {
         state.board.tapes = state.board.tapes.filter(t => t.id !== op.tapeId);
       }
       break;
+    case 'update_tape': {
+      if (state.board.tapes) {
+        const tape = state.board.tapes.find(t => t.id === op.tapeId);
+        if (tape) {
+          if (op.textItems !== undefined) tape.textItems = op.textItems;
+          if (op.drawingStrokes !== undefined) tape.drawingStrokes = op.drawingStrokes;
+        }
+      }
+      break;
+    }
+    case 'draw_tape_stroke': {
+      if (state.board.tapes) {
+        const tape = state.board.tapes.find(t => t.id === op.tapeId);
+        if (tape) {
+          if (!tape.drawingStrokes) tape.drawingStrokes = [];
+          tape.drawingStrokes.push(op.stroke);
+        }
+      }
+      break;
+    }
+    case 'erase_tape_strokes': {
+      if (state.board.tapes) {
+        const tape = state.board.tapes.find(t => t.id === op.tapeId);
+        if (tape) tape.drawingStrokes = [];
+      }
+      break;
+    }
     case 'lock_card': {
       const card = state.board.cards.find(c => c.id === op.cardId);
       if (card) card.lockedBy = op.playerId;
@@ -292,26 +331,68 @@ export function submitAccusation(
   lobbyId: string,
   playerId: string,
   suspectId: string,
-  _motive: string,
-  _method: string,
-): { correct: boolean; score: number } | undefined {
+  motive: string,
+  method: string,
+  evidenceIds: string[],
+): { votesNeeded: number; votesReceived: number } | undefined {
   const state = games.get(lobbyId);
-  if (!state) return undefined;
+  if (!state || state.accusationSubmitted) return undefined;
 
-  const correct = suspectId === state.caseData.solution.culpritId;
+  // Store player's vote
+  state.accusationVotes[playerId] = { suspectId, motive, method, evidenceIds };
 
-  if (!correct) {
-    state.score = Math.max(0, state.score - 200);
+  const lobby = getLobby(lobbyId);
+  if (!lobby) return undefined;
+
+  const totalPlayers = lobby.players.length;
+  const votesReceived = Object.keys(state.accusationVotes).length;
+
+  return { votesNeeded: totalPlayers, votesReceived };
+}
+
+export function checkAccusationResults(
+  lobbyId: string,
+): { correct: boolean; score: number; culpritId: string; playerVotes: Record<string, { suspectId: string; correct: boolean }> } | undefined {
+  const state = games.get(lobbyId);
+  if (!state || state.accusationSubmitted) return undefined;
+
+  const lobby = getLobby(lobbyId);
+  if (!lobby) return undefined;
+
+  // Check if all players have voted
+  const totalPlayers = lobby.players.length;
+  const votesReceived = Object.keys(state.accusationVotes).length;
+  if (votesReceived < totalPlayers) return undefined;
+
+  // Determine consensus (most voted suspect)
+  const voteCounts: Record<string, number> = {};
+  for (const vote of Object.values(state.accusationVotes)) {
+    voteCounts[vote.suspectId] = (voteCounts[vote.suspectId] || 0) + 1;
   }
 
-  state.accusations.push({ playerId, suspectId, correct });
+  const consensusSuspectId = Object.entries(voteCounts).reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+  const correct = consensusSuspectId === state.caseData.solution.culpritId;
 
-  if (correct) {
-    state.phase = 'results';
-    clearTimers(lobbyId);
+  // Build player vote results
+  const playerVotes: Record<string, { suspectId: string; correct: boolean }> = {};
+  for (const [playerId, vote] of Object.entries(state.accusationVotes)) {
+    playerVotes[playerId] = {
+      suspectId: vote.suspectId,
+      correct: vote.suspectId === state.caseData.solution.culpritId,
+    };
   }
 
-  return { correct, score: state.score };
+  // Update game state
+  state.accusationSubmitted = true;
+  state.phase = 'results';
+  clearTimers(lobbyId);
+
+  return {
+    correct,
+    score: state.score,
+    culpritId: state.caseData.solution.culpritId,
+    playerVotes,
+  };
 }
 
 export function removeGame(lobbyId: string): void {

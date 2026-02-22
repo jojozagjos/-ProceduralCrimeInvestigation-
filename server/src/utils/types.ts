@@ -244,6 +244,8 @@ export interface BoardTape {
   y: number;
   rotation: number;
   color?: string;
+  textItems?: NoteTextItem[];
+  drawingStrokes?: DrawingStroke[];
 }
 
 export interface BoardState {
@@ -266,6 +268,8 @@ export interface GameState {
   interviewVotes: Record<string, boolean>;
   interviewLog: { question: string; answer: string; category: InterviewCategory }[];
   accusations: { playerId: string; suspectId: string; correct: boolean }[];
+  accusationVotes: Record<string, { suspectId: string; motive: string; method: string; evidenceIds: string[] }>;
+  accusationSubmitted: boolean;
   hintsUsed: number;
   score: number;
   startedAt: number;
@@ -298,11 +302,15 @@ export type BoardOp =
   | { type: 'add_connection'; connection: BoardConnection }
   | { type: 'remove_connection'; connectionId: string }
   | { type: 'add_tape'; tape: BoardTape }
+  | { type: 'move_tape'; tapeId: string; x: number; y: number }
+  | { type: 'update_tape'; tapeId: string; textItems?: NoteTextItem[]; drawingStrokes?: DrawingStroke[] }
   | { type: 'remove_tape'; tapeId: string }
   | { type: 'lock_card'; cardId: string; playerId: string }
   | { type: 'unlock_card'; cardId: string }
   | { type: 'draw_stroke'; cardId: string; stroke: DrawingStroke }
   | { type: 'erase_strokes'; cardId: string }
+  | { type: 'draw_tape_stroke'; tapeId: string; stroke: DrawingStroke }
+  | { type: 'erase_tape_strokes'; tapeId: string }
   | { type: 'undo' }
   | { type: 'redo' };
 
@@ -327,7 +335,8 @@ export type ServerMessage =
   | { type: 'board:updated'; data: { board: BoardState } }
   | { type: 'board:op_applied'; data: { op: BoardOp } }
   | { type: 'evidence:discovered'; data: { evidenceId: string; discoveredBy: string } }
-  | { type: 'accusation:result'; data: { playerId: string; correct: boolean; score: number } }
+  | { type: 'accusation:vote_status'; data: { votesReceived: number; votesNeeded: number } }
+  | { type: 'accusation:results'; data: { correct: boolean; score: number; culpritId: string; playerVotes: Record<string, { suspectId: string; correct: boolean }>; solution: GameState['caseData']['solution'] } }
   | { type: 'game:end'; data: { won: boolean; score: number; solution: GameState['caseData']['solution'] } }
   | { type: 'error'; data: { message: string } }
   | { type: 'pong' };

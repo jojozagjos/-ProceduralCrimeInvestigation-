@@ -70,9 +70,45 @@ class GameStore {
         if (!b.tapes) b.tapes = [];
         b.tapes.push(op.tape);
         break;
+      case 'move_tape':
+        if (b.tapes) {
+          const tape = b.tapes.find(t => t.id === op.tapeId);
+          if (tape) {
+            tape.x = op.x;
+            tape.y = op.y;
+          }
+        }
+        break;
       case 'remove_tape':
         if (b.tapes) b.tapes = b.tapes.filter(t => t.id !== op.tapeId);
         break;
+      case 'update_tape': {
+        if (b.tapes) {
+          const tape = b.tapes.find(t => t.id === op.tapeId);
+          if (tape) {
+            if (op.textItems !== undefined) tape.textItems = op.textItems;
+            if (op.drawingStrokes !== undefined) tape.drawingStrokes = op.drawingStrokes;
+          }
+        }
+        break;
+      }
+      case 'draw_tape_stroke': {
+        if (b.tapes) {
+          const tape = b.tapes.find(t => t.id === op.tapeId);
+          if (tape) {
+            if (!tape.drawingStrokes) tape.drawingStrokes = [];
+            tape.drawingStrokes.push(op.stroke);
+          }
+        }
+        break;
+      }
+      case 'erase_tape_strokes': {
+        if (b.tapes) {
+          const tape = b.tapes.find(t => t.id === op.tapeId);
+          if (tape) tape.drawingStrokes = [];
+        }
+        break;
+      }
       case 'lock_card': {
         const c = b.cards.find(c => c.id === op.cardId);
         if (c) c.lockedBy = op.playerId;

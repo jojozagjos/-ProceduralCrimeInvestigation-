@@ -13,7 +13,7 @@ let ropeGraphics: PIXI.Graphics;
 let pinOverlay: PIXI.Graphics;
 let tapeContainer: PIXI.Container;
 let cardSprites: Map<string, PIXI.Container> = new Map();
-let tapeSprites: Map<string, PIXI.Graphics> = new Map();
+let tapeSprites: Map<string, PIXI.Container> = new Map();
 let ropeSimulations: Map<string, VerletRope> = new Map();
 let isDragging = false;
 let dragTarget: PIXI.Container | null = null;
@@ -374,9 +374,11 @@ export function renderCorkboard(container: HTMLElement): void {
       dragTarget.x = targetX;
       dragTarget.y = targetY;
 
-      // Update rope endpoints with current position
+      // Update rope endpoints with current position (for cards)
       const cardId = dragTarget.name;
-      if (cardId) updateRopeEndpoints(cardId, dragTarget.x, dragTarget.y);
+      if (cardId && !cardId.startsWith('tape_')) {
+        updateRopeEndpoints(cardId, dragTarget.x, dragTarget.y);
+      }
     }
   });
 
@@ -388,13 +390,34 @@ export function renderCorkboard(container: HTMLElement): void {
       return;
     }
     if (isDragging && dragTarget) {
-      const cardId = dragTarget.name;
-      if (cardId) {
-        sendBoardOpWithHistory({ type: 'move_card', cardId, x: dragTarget.x - PIN_X, y: dragTarget.y - PIN_HEAD_Y });
+      const tapeId = dragTarget.name;
+      if (tapeId && tapeId.startsWith('tape_')) {
+        // Save tape position
+        sendBoardOpWithHistory({ 
+          type: 'move_tape', 
+          tapeId: tapeId,
+          x: dragTarget.x,
+          y: dragTarget.y
+        });
+      } else {
+        // Card dragging
+        const cardId = dragTarget.name;
+        if (cardId) {
+          sendBoardOpWithHistory({ type: 'move_card', cardId, x: dragTarget.x - PIN_X, y: dragTarget.y - PIN_HEAD_Y });
+        }
       }
       isDragging = false;
       dragTarget = null;
     }
+  });
+  
+  // Global mouseup to always clear drag state (prevents stuck dragging)
+  window.addEventListener('mouseup', () => {
+    if (isDragging) {
+      isDragging = false;
+      dragTarget = null;
+    }
+    isPanning = false;
   });
 
   // Connect mode button (HTML overlay)
@@ -794,35 +817,104 @@ export function renderCorkboard(container: HTMLElement): void {
   });
 }
 
+const TAPE_W = 80;
+const TAPE_H = 16;
+const TAPE_CANVAS_W = 240;
+const TAPE_CANVAS_H = 80;
+
+function buildTapeTextSprite(tape: BoardTape, item: NoteTextItem): PIXI.Text {
+  const scaleX = TAPE_W / TAPE_CANVAS_W;
+  const scaleY = TAPE_H / TAPE_CANVAS_H;
+  const style = new PIXI.TextStyle({
+    fontFamily: 'Georgia, serif',
+    fontSize: Math.max(4, (item.size || 12) * scaleX),
+    fill: item.color || '#2a1a0a',
+    wordWrap: true,
+    wordWrapWidth: TAPE_W - 4,
+  });
+  const text = new PIXI.Text(item.text.slice(0, 50), style);
+  text.resolution = 4;
+  text.name = `tape-text:${item.id}`;
+  text.anchor.set(0.5);
+  text.x = (item.x - TAPE_CANVAS_W / 2) * scaleX;
+  text.y = (item.y - TAPE_CANVAS_H / 2) * scaleY;
+  text.rotation = ((item.rotation || 0) * Math.PI) / 180;
+  return text;
+}
+
+function buildTapeDrawingGraphics(tape: BoardTape): PIXI.Graphics {
+  const graphics = new PIXI.Graphics();
+  const scaleX = TAPE_W / TAPE_CANVAS_W;
+  const scaleY = TAPE_H / TAPE_CANVAS_H;
+  const offsetX = -TAPE_W / 2;
+  const offsetY = -TAPE_H / 2;
+  for (const stroke of tape.drawingStrokes || []) {
+    graphics.lineStyle(Math.max(0.5, stroke.width * scaleX), 0x2a1a0a, 0.85);
+    for (let i = 0; i < stroke.points.length; i++) {
+      const p = stroke.points[i];
+      const x = p.x * scaleX + offsetX;
+      const y = p.y * scaleY + offsetY;
+      if (i === 0) graphics.moveTo(x, y);
+      else graphics.lineTo(x, y);
+    }
+  }
+  return graphics;
+}
+
 function createTapeSprite(tape: BoardTape): void {
   if (!app) return;
   
-  const sprite = new PIXI.Graphics();
-  sprite.name = tape.id;
+  const container = new PIXI.Container();
+  container.name = tape.id;
+  container.x = tape.x;
+  container.y = tape.y;
+  container.rotation = (tape.rotation * Math.PI) / 180;
+  container.eventMode = 'static';
+  container.cursor = 'pointer';
   
-  // Draw tape piece - looks like masking tape
+  // Draw tape piece background - looks like masking tape
+  const bg = new PIXI.Graphics();
   const color = tape.color ? parseInt(tape.color.replace('#', ''), 16) : 0xf5deb3;
-  sprite.beginFill(color, 0.7);
-  sprite.lineStyle(1, 0x000000, 0.1);
-  sprite.drawRoundedRect(-40, -8, 80, 16, 2);
-  sprite.endFill();
+  bg.beginFill(color, 0.7);
+  bg.lineStyle(1, 0x000000, 0.1);
+  bg.drawRoundedRect(-40, -8, 80, 16, 2);
+  bg.endFill();
   
   // Add texture/pattern for realism
-  sprite.lineStyle(1, 0x000000, 0.05);
+  bg.lineStyle(1, 0x000000, 0.05);
   for (let i = -35; i < 40; i += 10) {
-    sprite.moveTo(i, -6);
-    sprite.lineTo(i, 6);
+    bg.moveTo(i, -6);
+    bg.lineTo(i, 6);
+  }
+  container.addChild(bg);
+  
+  // Add text items
+  const textItems = tape.textItems || [];
+  for (const item of textItems) {
+    const textSprite = buildTapeTextSprite(tape, item);
+    container.addChild(textSprite);
   }
   
-  sprite.x = tape.x;
-  sprite.y = tape.y;
-  sprite.rotation = (tape.rotation * Math.PI) / 180;
-  sprite.eventMode = 'static';
-  sprite.cursor = 'pointer';
+  // Add drawing graphics
+  const drawingGraphics = buildTapeDrawingGraphics(tape);
+  container.addChild(drawingGraphics);
   
-  // Click to delete in delete mode
-  sprite.on('pointerdown', () => {
+  // Double click to edit
+  let lastTapeClickTime = 0;
+  container.on('pointertap', () => {
+    const now = Date.now();
+    if (now - lastTapeClickTime < 300) {
+      if (!deleteMode && !connectMode) {
+        openTapeEditor(tape);
+      }
+    }
+    lastTapeClickTime = now;
+  });
+  
+  // Handle interactions
+  container.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
     if (deleteMode) {
+      // Clear drag state
       isDragging = false;
       dragTarget = null;
       
@@ -838,11 +930,19 @@ function createTapeSprite(tape: BoardTape): void {
         deleteMode = false;
         document.getElementById('btn-delete')?.classList.remove('active');
       });
+      return;
     }
+    
+    // Allow dragging tape when not in delete mode
+    isDragging = true;
+    dragTarget = container;
+    const local = boardContainer.toLocal(e.global);
+    dragOffset.x = container.x - local.x;
+    dragOffset.y = container.y - local.y;
   });
   
-  tapeContainer.addChild(sprite);
-  tapeSprites.set(tape.id, sprite);
+  tapeContainer.addChild(container);
+  tapeSprites.set(tape.id, container);
   
   // Initialize physics
   tapePhysics.set(tape.id, {
@@ -943,16 +1043,46 @@ function syncBoard(): void {
   const existingTapes = new Set(tapeSprites.keys());
   const tapes = board.tapes || [];
   for (const tape of tapes) {
-    if (!tapeSprites.has(tape.id)) {
+    const existingSprite = tapeSprites.get(tape.id);
+    const physics = tapePhysics.get(tape.id);
+    
+    if (!existingSprite) {
       createTapeSprite(tape);
     } else {
-      // Update position and rotation for non-deleting tapes
-      const sprite = tapeSprites.get(tape.id)!;
-      const physics = tapePhysics.get(tape.id);
+      // Check if content has changed (text or drawings)
+      const needsRebuild = (tape.textItems?.length || 0) > 0 || (tape.drawingStrokes?.length || 0) > 0;
+      
       if (!physics?.isDeleting) {
-        sprite.x = tape.x;
-        sprite.y = tape.y;
-        sprite.rotation = (tape.rotation * Math.PI) / 180;
+        if (needsRebuild) {
+          // Recreate sprite to show updated content
+          const oldX = existingSprite.x;
+          const oldY = existingSprite.y;
+          const oldRotation = existingSprite.rotation;
+          
+          tapeContainer.removeChild(existingSprite);
+          tapeSprites.delete(tape.id);
+          
+          createTapeSprite(tape);
+          const newSprite = tapeSprites.get(tape.id);
+          if (newSprite) {
+            newSprite.x = oldX;
+            newSprite.y = oldY;
+            newSprite.rotation = oldRotation;
+          }
+        } else {
+          // Just update position/rotation
+          existingSprite.x = tape.x;
+          existingSprite.y = tape.y;
+          existingSprite.rotation = (tape.rotation * Math.PI) / 180;
+        }
+        
+        // Update physics position to match
+        if (physics) {
+          physics.x = tape.x;
+          physics.y = tape.y;
+          physics.oldX = tape.x;
+          physics.oldY = tape.y;
+        }
       }
     }
     existingTapes.delete(tape.id);
@@ -1325,7 +1455,8 @@ function drawCardBackground(bg: PIXI.Graphics, card: BoardCard): void {
 function getNoteTextItems(card: BoardCard): NoteTextItem[] {
   if (card.textItems && card.textItems.length > 0) return card.textItems;
   if (card.content) {
-    return [{ id: 'legacy-text', text: card.content, x: 6, y: 36, size: 10 }];
+    // Position text below title (title is at ~16px, so start content at ~60px in canvas coords)
+    return [{ id: 'legacy-text', text: card.content, x: 20, y: 60, size: 10, w: 160, h: 70 }];
   }
   return [];
 }
@@ -1346,14 +1477,22 @@ function buildNoteTextSprite(card: BoardCard, item: NoteTextItem): PIXI.Text {
     fontSize: Math.max(6, (item.size || 10) * scaleX),
     fill: item.color || '#2a1a0a',
     wordWrap: true,
-    wordWrapWidth: CARD_W - 10,
+    wordWrapWidth: (item.w || CARD_W - 10) * scaleX,
   });
   const text = new PIXI.Text(item.text.slice(0, 200), style);
   text.resolution = 4;
   text.name = `note-text:${item.id}`;
-  text.anchor.set(0.5);
-  text.x = item.x * scaleX + text.width / 2;
-  text.y = item.y * scaleY + text.height / 2;
+  // Use top-left anchor for legacy evidence cards to prevent overlap
+  if (item.id === 'legacy-text') {
+    text.anchor.set(0, 0);
+    text.x = item.x * scaleX;
+    text.y = item.y * scaleY;
+  } else {
+    // For user-added text, use center anchor with stored top-left position
+    text.anchor.set(0.5);
+    text.x = item.x * scaleX + ((item.w || CARD_W - 10) * scaleX) / 2;
+    text.y = item.y * scaleY + ((item.h || 20) * scaleY) / 2;
+  }
   text.rotation = ((item.rotation || 0) * Math.PI) / 180;
   return text;
 }
@@ -1413,10 +1552,10 @@ function startItemDrag(
   if (cardData && type === 'image' && (!cardData.imageItems || cardData.imageItems.length === 0)) {
     cardData.imageItems = getNoteImageItems(cardData);
   }
-  const items = type === 'text' ? cardData?.textItems : cardData?.imageItems;
-  const item = items?.find(i => i.id === itemId);
-  const offsetX = item ? local.x - item.x : 0;
-  const offsetY = item ? local.y - item.y : 0;
+  // Get the actual sprite to calculate offset correctly
+  const sprite = card.getChildByName(`${type === 'text' ? 'note-text' : 'note-image'}:${itemId}`);
+  const offsetX = sprite ? local.x - sprite.x : 0;
+  const offsetY = sprite ? local.y - sprite.y : 0;
   dragItem = {
     cardId,
     type,
@@ -1720,7 +1859,7 @@ function openCardEditor(card: BoardCard): void {
 
   function setSelected(type: 'text' | 'image', id: string): void {
     selected = { type, id };
-    selectedLabel.textContent = `${type} ${id}`;
+    selectedLabel.textContent = `${type === 'text' ? 'Text' : 'Image'} (${id.slice(0, 8)})`;
     const item = (type === 'text' ? textItems : imageItems).find(i => i.id === id) as any;
     if (!item) return;
     if (type === 'text') {
@@ -1739,6 +1878,13 @@ function openCardEditor(card: BoardCard): void {
       fontControls.style.display = 'none';
     }
     updateSelectionBox();
+  }
+  
+  function clearSelection(): void {
+    selected = null;
+    selectedLabel.textContent = 'None';
+    fontControls.style.display = 'none';
+    selectionBox.style.display = 'none';
   }
 
   function updateSelected(): void {
@@ -1809,9 +1955,7 @@ function openCardEditor(card: BoardCard): void {
     const id = target.dataset.id;
     const type = target.dataset.type as 'text' | 'image' | undefined;
     if (!id || !type) {
-      selected = null;
-      selectedLabel.textContent = 'None';
-      selectionBox.style.display = 'none';
+      clearSelection();
       return;
     }
     if (noteCanvas.classList.contains('drawing-active')) return;
@@ -1908,8 +2052,17 @@ function openCardEditor(card: BoardCard): void {
       return;
     }
     if (scaleHandle) {
-      const dx = e.clientX - rect.left - startX;
-      const dy = e.clientY - rect.top - startY;
+      // Raw mouse delta
+      let dx = e.clientX - rect.left - startX;
+      let dy = e.clientY - rect.top - startY;
+      
+      // Account for item rotation by rotating the delta backwards
+      const rotationRad = ((item.rotation || 0) * Math.PI) / 180;
+      const rotatedDx = dx * Math.cos(-rotationRad) - dy * Math.sin(-rotationRad);
+      const rotatedDy = dx * Math.sin(-rotationRad) + dy * Math.cos(-rotationRad);
+      dx = rotatedDx;
+      dy = rotatedDy;
+      
       let w = startW;
       let h = startH;
       if (scaleHandle.includes('br')) {
@@ -2058,14 +2211,15 @@ function openCardEditor(card: BoardCard): void {
   }
 
   function updateDrawButtons(): void {
-    document.getElementById('draw-pen')?.classList.toggle('active', drawMode === 'pen');
-    document.getElementById('draw-eraser')?.classList.toggle('active', drawMode === 'eraser');
+    const isActive = noteCanvas.classList.contains('drawing-active');
+    document.getElementById('draw-pen')?.classList.toggle('active', drawMode === 'pen' && isActive);
+    document.getElementById('draw-eraser')?.classList.toggle('active', drawMode === 'eraser' && isActive);
   }
 
   drawCanvas.addEventListener('mousedown', (e) => { 
+    if (!noteCanvas.classList.contains('drawing-active')) return;
     isDrawing = true; 
     currentStroke.length = 0;
-    setDrawingActive(true);
     const rect = drawCanvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -2099,6 +2253,7 @@ function openCardEditor(card: BoardCard): void {
   });
   
   drawCanvas.addEventListener('mouseup', () => {
+    if (!isDrawing) return;
     if (isDrawing && currentStroke.length > 0) {
       const noteColor = (document.getElementById('card-color-edit') as HTMLInputElement).value || '#fffacd';
       const stroke: DrawingStroke = {
@@ -2127,14 +2282,28 @@ function openCardEditor(card: BoardCard): void {
   });
 
   document.getElementById('draw-pen')!.addEventListener('click', () => { 
-    drawMode = 'pen'; 
-    brushSize = 3;
+    const wasActive = drawMode === 'pen' && noteCanvas.classList.contains('drawing-active');
+    if (wasActive) {
+      setDrawingActive(false);
+      drawMode = 'pen';
+    } else {
+      drawMode = 'pen'; 
+      brushSize = 3;
+      setDrawingActive(true);
+    }
     updateDrawButtons();
   });
   
   document.getElementById('draw-eraser')!.addEventListener('click', () => { 
-    drawMode = 'eraser'; 
-    brushSize = 8;
+    const wasActive = drawMode === 'eraser' && noteCanvas.classList.contains('drawing-active');
+    if (wasActive) {
+      setDrawingActive(false);
+      drawMode = 'pen';
+    } else {
+      drawMode = 'eraser'; 
+      brushSize = 8;
+      setDrawingActive(true);
+    }
     updateDrawButtons();
   });
   
@@ -2167,6 +2336,504 @@ function openCardEditor(card: BoardCard): void {
 
   document.getElementById('card-cancel')!.addEventListener('click', () => {
     net.sendBoardOp(gameStore.getLobbyId(), { type: 'unlock_card', cardId: card.id });
+    overlay.remove();
+  });
+}
+
+function openTapeEditor(tape: BoardTape): void {
+  const overlay = document.createElement('div');
+  overlay.className = 'card-editor-overlay';
+  
+  const TAPE_CANVAS_W = 240;
+  const TAPE_CANVAS_H = 80;
+  
+  overlay.innerHTML = `
+    <div class="card-editor">
+      <h3>Edit Tape</h3>
+      <div class="note-canvas-toolbar">
+        <div class="note-canvas-actions">
+          <button class="btn btn-xs" id="btn-add-tape-text">Add Text</button>
+          <button class="btn btn-xs" id="btn-delete-tape-item">Delete</button>
+        </div>
+        <div class="note-canvas-tools">
+          <button class="btn btn-xs" id="draw-tape-pen">✏️ Pen</button>
+          <button class="btn btn-xs" id="draw-tape-eraser">🧹 Erase</button>
+          <button class="btn btn-xs" id="draw-tape-clear">Clear Drawing</button>
+        </div>
+      </div>
+      <div class="note-canvas-row">
+        <div class="note-canvas" id="tape-canvas" style="width: ${TAPE_CANVAS_W}px; height: ${TAPE_CANVAS_H}px; background: #f5deb3; position: relative; margin: 20px auto; border: 1px solid #ddd; border-radius: 4px;">
+          <canvas id="tape-draw-canvas" width="${TAPE_CANVAS_W}" height="${TAPE_CANVAS_H}"></canvas>
+          <div class="note-selection" id="tape-selection" style="display:none;">
+            <div class="handle handle-rotate" data-handle="rotate"></div>
+            <div class="handle handle-tl" data-handle="scale-tl"></div>
+            <div class="handle handle-tr" data-handle="scale-tr"></div>
+            <div class="handle handle-bl" data-handle="scale-bl"></div>
+            <div class="handle handle-br" data-handle="scale-br"></div>
+          </div>
+        </div>
+        <div class="note-side note-side-right">
+          <div class="note-inspector" id="tape-inspector">
+            <div class="form-row">
+              <label>Selected</label>
+              <span id="tape-selected-label" class="muted">None</span>
+            </div>
+            <div class="form-row" id="tape-text-controls" style="display:none;">
+              <label>Text Color</label>
+              <input type="color" id="tape-font-color" value="#2a1a0a" />
+              <label>Text Size</label>
+              <input type="range" id="tape-font-size" min="8" max="32" value="12" />
+              <span id="tape-font-size-label">12px</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="tape-cancel">Cancel</button>
+        <button class="btn btn-play" id="tape-save">Save</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const textItems: NoteTextItem[] = tape.textItems ? tape.textItems.map(i => ({ ...i })) : [];
+  
+  const tapeCanvas = document.getElementById('tape-canvas') as HTMLDivElement;
+  const drawCanvas = document.getElementById('tape-draw-canvas') as HTMLCanvasElement;
+  const drawCtx = drawCanvas.getContext('2d')!;
+  const selectionBox = document.getElementById('tape-selection') as HTMLDivElement;
+  let selected: { type: 'text'; id: string } | null = null;
+
+  const fontControls = document.getElementById('tape-text-controls') as HTMLDivElement;
+  const fontColorInput = document.getElementById('tape-font-color') as HTMLInputElement;
+  const fontSizeInput = document.getElementById('tape-font-size') as HTMLInputElement;
+  const fontSizeLabel = document.getElementById('tape-font-size-label') as HTMLSpanElement;
+  const selectedLabel = document.getElementById('tape-selected-label') as HTMLSpanElement;
+  const deleteBtn = document.getElementById('btn-delete-tape-item') as HTMLButtonElement;
+
+  function renderCanvas(): void {
+    tapeCanvas.querySelectorAll('.note-canvas-item').forEach(el => el.remove());
+    
+    for (const item of textItems) {
+      const div = document.createElement('div');
+      div.contentEditable = 'false';
+      div.className = 'note-canvas-item note-text';
+      div.textContent = item.text;
+      div.style.position = 'absolute';
+      div.style.left = `${item.x}px`;
+      div.style.top = `${item.y}px`;
+      if (item.w) div.style.width = `${item.w}px`;
+      if (item.h) div.style.height = `${item.h}px`;
+      div.style.fontSize = `${item.size || 12}px`;
+      div.style.color = item.color || '#2a1a0a';
+      div.style.transform = `rotate(${ item.rotation || 0}deg)`;
+      div.dataset.id = item.id;
+      div.dataset.type = 'text';
+      div.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        div.contentEditable = 'true';
+        div.focus();
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(div);
+        range.collapse(false);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      });
+      div.addEventListener('blur', () => {
+        div.contentEditable = 'false';
+        item.text = div.textContent || '';
+      });
+      div.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          div.blur();
+        }
+      });
+      tapeCanvas.appendChild(div);
+    }
+  }
+
+  function setSelected(id: string): void {
+    selected = { type: 'text', id };
+    selectedLabel.textContent = `Text (${id.slice(0, 8)})`;
+    const item = textItems.find(i => i.id === id);
+    if (!item) return;
+    const el = getSelectedElement();
+    if (el && (!item.w || !item.h)) {
+      item.w = el.offsetWidth;
+      item.h = el.offsetHeight;
+    }
+    fontControls.style.display = 'flex';
+    fontColorInput.value = item.color || '#2a1a0a';
+    fontSizeInput.value = String(item.size || 12);
+    fontSizeLabel.textContent = `${item.size || 12}px`;
+    updateSelectionBox();
+  }
+
+  function clearSelection(): void {
+    selected = null;
+    selectedLabel.textContent = 'None';
+    fontControls.style.display = 'none';
+    selectionBox.style.display = 'none';
+  }
+
+  function updateSelected(): void {
+    if (!selected) return;
+    const item = textItems.find(i => i.id === selected!.id);
+    if (!item) return;
+    item.color = fontColorInput.value;
+    item.size = parseInt(fontSizeInput.value) || 12;
+    fontSizeLabel.textContent = `${item.size}px`;
+    renderCanvas();
+    updateSelectionBox();
+  }
+
+  function getSelectedElement(): HTMLElement | null {
+    if (!selected) return null;
+    return tapeCanvas.querySelector(`.note-canvas-item[data-id="${selected.id}"][data-type="text"]`) as HTMLElement | null;
+  }
+
+  function updateSelectionBox(): void {
+    const el = getSelectedElement();
+    if (!el) {
+      selectionBox.style.display = 'none';
+      return;
+    }
+    const item = textItems.find(i => i.id === selected!.id);
+    if (!item) return;
+    const w = item.w || el.offsetWidth;
+    const h = item.h || el.offsetHeight;
+    selectionBox.style.display = 'block';
+    selectionBox.style.left = `${item.x}px`;
+    selectionBox.style.top = `${item.y}px`;
+    selectionBox.style.width = `${w}px`;
+    selectionBox.style.height = `${h}px`;
+    selectionBox.style.transform = `rotate(${item.rotation || 0}deg)`;
+    selectionBox.style.transformOrigin = 'center center';
+  }
+
+  fontColorInput.addEventListener('input', updateSelected);
+  fontSizeInput.addEventListener('input', updateSelected);
+
+  function getItemSize(item: NoteTextItem): { w: number; h: number } {
+    if (item.w && item.h) return { w: item.w, h: item.h };
+    const el = getSelectedElement();
+    if (el) return { w: el.offsetWidth, h: el.offsetHeight };
+    return { w: 60, h: 20 };
+  }
+
+  function clampPosition(pos: number, size: number, limit: number): number {
+    const min = Math.min(0, limit - size);
+    const max = Math.max(0, limit - size);
+    return clamp(pos, min, max);
+  }
+
+  let draggingItem: { id: string; offsetX: number; offsetY: number } | null = null;
+
+  tapeCanvas.addEventListener('mousedown', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('.note-selection')) return;
+    const id = target.dataset.id;
+    const type = target.dataset.type;
+    if (!id || type !== 'text') {
+      clearSelection();
+      return;
+    }
+    if (tapeCanvas.classList.contains('drawing-active')) return;
+    if (target.isContentEditable) return;
+    setSelected(id);
+    const rect = tapeCanvas.getBoundingClientRect();
+    const item = textItems.find(i => i.id === id);
+    if (!item) return;
+    draggingItem = {
+      id,
+      offsetX: e.clientX - rect.left - item.x,
+      offsetY: e.clientY - rect.top - item.y,
+    };
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!draggingItem) return;
+    const rect = tapeCanvas.getBoundingClientRect();
+    const item = textItems.find(i => i.id === draggingItem!.id);
+    if (!item) return;
+    const nextX = e.clientX - rect.left - draggingItem.offsetX;
+    const nextY = e.clientY - rect.top - draggingItem.offsetY;
+    const size = getItemSize(item);
+    item.x = clampPosition(nextX, size.w, TAPE_CANVAS_W);
+    item.y = clampPosition(nextY, size.h, TAPE_CANVAS_H);
+    renderCanvas();
+    updateSelectionBox();
+  });
+
+  window.addEventListener('mouseup', () => { draggingItem = null; });
+
+  let rotateHandleActive = false;
+  let scaleHandle: string | null = null;
+  let startAngle = 0;
+  let startRotation = 0;
+  let startW = 0;
+  let startH = 0;
+  let startX = 0;
+  let startY = 0;
+
+  selectionBox.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    const handle = (e.target as HTMLElement).dataset.handle;
+    if (!selected) return;
+    e.preventDefault();
+    const rect = tapeCanvas.getBoundingClientRect();
+    const item = textItems.find(i => i.id === selected!.id);
+    if (!item) return;
+    const size = getItemSize(item);
+    if (!handle) {
+      draggingItem = {
+        id: selected.id,
+        offsetX: e.clientX - rect.left - item.x,
+        offsetY: e.clientY - rect.top - item.y,
+      };
+      return;
+    }
+    if (handle === 'rotate') {
+      rotateHandleActive = true;
+      const cx = rect.left + item.x + size.w / 2;
+      const cy = rect.top + item.y + size.h / 2;
+      startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
+      startRotation = item.rotation || 0;
+      return;
+    }
+    scaleHandle = handle;
+    startW = size.w;
+    startH = size.h;
+    startX = item.x;
+    startY = item.y;
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!selected) return;
+    const item = textItems.find(i => i.id === selected!.id);
+    if (!item) return;
+    const rect = tapeCanvas.getBoundingClientRect();
+    if (rotateHandleActive) {
+      const size = getItemSize(item);
+      const cx = rect.left + item.x + size.w / 2;
+      const cy = rect.top + item.y + size.h / 2;
+      let angle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
+      let next = startRotation + (angle - startAngle);
+      if (e.shiftKey) {
+        next = Math.round(next / 15) * 15;
+      }
+      item.rotation = next;
+      renderCanvas();
+      updateSelectionBox();
+      return;
+    }
+    if (scaleHandle) {
+      let dx = e.clientX - rect.left - startX;
+      let dy = e.clientY - rect.top - startY;
+      
+      const rotationRad = ((item.rotation || 0) * Math.PI) / 180;
+      const rotatedDx = dx * Math.cos(-rotationRad) - dy * Math.sin(-rotationRad);
+      const rotatedDy = dx * Math.sin(-rotationRad) + dy * Math.cos(-rotationRad);
+      dx = rotatedDx;
+      dy = rotatedDy;
+      
+      let w = startW;
+      let h = startH;
+      if (scaleHandle.includes('br')) {
+        w = Math.max(20, dx);
+        h = Math.max(20, dy);
+      } else if (scaleHandle.includes('tr')) {
+        w = Math.max(20, dx);
+        h = Math.max(20, startH - dy);
+        item.y = startY + (startH - h);
+      } else if (scaleHandle.includes('bl')) {
+        w = Math.max(20, startW - dx);
+        h = Math.max(20, dy);
+        item.x = startX + (startW - w);
+      } else if (scaleHandle.includes('tl')) {
+        w = Math.max(20, startW - dx);
+        h = Math.max(20, startH - dy);
+        item.x = startX + (startW - w);
+        item.y = startY + (startH - h);
+      }
+      if (e.shiftKey) {
+        const ratio = startW / Math.max(1, startH);
+        h = w / ratio;
+      }
+      item.w = w;
+      item.h = h;
+      item.x = clampPosition(item.x, w, TAPE_CANVAS_W);
+      item.y = clampPosition(item.y, h, TAPE_CANVAS_H);
+      renderCanvas();
+      updateSelectionBox();
+      return;
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    rotateHandleActive = false;
+    scaleHandle = null;
+  });
+
+  deleteBtn.addEventListener('click', () => {
+    if (!selected) return;
+    const idx = textItems.findIndex(t => t.id === selected!.id);
+    if (idx >= 0) textItems.splice(idx, 1);
+    clearSelection();
+    renderCanvas();
+  });
+
+  document.getElementById('btn-add-tape-text')!.addEventListener('click', () => {
+    const id = `text_${Math.random().toString(36).slice(2, 8)}`;
+    textItems.push({ id, text: 'Text', x: 20, y: 30, w: 60, h: 20, size: 12, color: '#2a1a0a', rotation: 0 });
+    renderCanvas();
+    setSelected(id);
+  });
+
+  renderCanvas();
+
+  // Drawing functionality
+  let isDrawing = false;
+  let drawMode: 'pen' | 'eraser' = 'pen';
+  let brushSize = 2;
+  const currentStroke: { x: number; y: number }[] = [];
+
+  drawCtx.lineCap = 'round';
+  drawCtx.lineJoin = 'round';
+
+  function redrawStrokes(): void {
+    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    if (tape.drawingStrokes) {
+      for (const stroke of tape.drawingStrokes) {
+        drawCtx.strokeStyle = stroke.color;
+        drawCtx.lineWidth = stroke.width;
+        drawCtx.lineCap = 'round';
+        drawCtx.lineJoin = 'round';
+        drawCtx.beginPath();
+        for (let i = 0; i < stroke.points.length; i++) {
+          if (i === 0) drawCtx.moveTo(stroke.points[i].x, stroke.points[i].y);
+          else drawCtx.lineTo(stroke.points[i].x, stroke.points[i].y);
+        }
+        drawCtx.stroke();
+      }
+    }
+  }
+
+  redrawStrokes();
+
+  function setDrawingActive(active: boolean): void {
+    tapeCanvas.classList.toggle('drawing-active', active);
+  }
+
+  function updateDrawButtons(): void {
+    const isActive = tapeCanvas.classList.contains('drawing-active');
+    document.getElementById('draw-tape-pen')?.classList.toggle('active', drawMode === 'pen' && isActive);
+    document.getElementById('draw-tape-eraser')?.classList.toggle('active', drawMode === 'eraser' && isActive);
+  }
+
+  drawCanvas.addEventListener('mousedown', (e) => {
+    if (!tapeCanvas.classList.contains('drawing-active')) return;
+    isDrawing = true;
+    currentStroke.length = 0;
+    const rect = drawCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    currentStroke.push({ x, y });
+  });
+
+  drawCanvas.addEventListener('mousemove', (e) => {
+    if (!isDrawing) return;
+    const rect = drawCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    currentStroke.push({ x, y });
+
+    if (drawMode === 'pen') {
+      drawCtx.strokeStyle = '#2a1a0a';
+      drawCtx.lineWidth = brushSize;
+      drawCtx.globalCompositeOperation = 'source-over';
+    } else {
+      drawCtx.strokeStyle = '#f5deb3';
+      drawCtx.lineWidth = brushSize * 4;
+      drawCtx.globalCompositeOperation = 'source-over';
+    }
+
+    if (currentStroke.length > 1) {
+      drawCtx.beginPath();
+      drawCtx.moveTo(currentStroke[currentStroke.length - 2].x, currentStroke[currentStroke.length - 2].y);
+      drawCtx.lineTo(x, y);
+      drawCtx.stroke();
+    }
+  });
+
+  drawCanvas.addEventListener('mouseup', () => {
+    if (!isDrawing) return;
+    if (isDrawing && currentStroke.length > 0) {
+      const stroke: DrawingStroke = {
+        points: [...currentStroke],
+        color: drawMode === 'pen' ? '#2a1a0a' : '#f5deb3',
+        width: drawMode === 'pen' ? brushSize : brushSize * 4,
+      };
+      sendBoardOpWithHistory({ type: 'draw_tape_stroke', tapeId: tape.id, stroke });
+    }
+    isDrawing = false;
+    setDrawingActive(false);
+  });
+
+  drawCanvas.addEventListener('mouseleave', () => {
+    if (isDrawing && currentStroke.length > 0) {
+      const stroke: DrawingStroke = {
+        points: [...currentStroke],
+        color: drawMode === 'pen' ? '#2a1a0a' : '#f5deb3',
+        width: drawMode === 'pen' ? brushSize : brushSize * 4,
+      };
+      sendBoardOpWithHistory({ type: 'draw_tape_stroke', tapeId: tape.id, stroke });
+    }
+    isDrawing = false;
+    setDrawingActive(false);
+  });
+
+  document.getElementById('draw-tape-pen')!.addEventListener('click', () => {
+    if (drawMode === 'pen' && tapeCanvas.classList.contains('drawing-active')) {
+      setDrawingActive(false);
+    } else {
+      drawMode = 'pen';
+      setDrawingActive(true);
+    }
+    updateDrawButtons();
+  });
+
+  document.getElementById('draw-tape-eraser')!.addEventListener('click', () => {
+    if (drawMode === 'eraser' && tapeCanvas.classList.contains('drawing-active')) {
+      setDrawingActive(false);
+    } else {
+      drawMode = 'eraser';
+      setDrawingActive(true);
+    }
+    updateDrawButtons();
+  });
+
+  document.getElementById('draw-tape-clear')!.addEventListener('click', () => {
+    sendBoardOpWithHistory({ type: 'erase_tape_strokes', tapeId: tape.id });
+    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  });
+
+  updateDrawButtons();
+
+  document.getElementById('tape-save')!.addEventListener('click', () => {
+    sendBoardOpWithHistory({
+      type: 'update_tape',
+      tapeId: tape.id,
+      textItems: textItems.length ? textItems : undefined,
+      drawingStrokes: tape.drawingStrokes,
+    });
+    overlay.remove();
+  });
+
+  document.getElementById('tape-cancel')!.addEventListener('click', () => {
     overlay.remove();
   });
 }

@@ -371,19 +371,28 @@ async function handleMessage(client: ClientSocket, message: ClientMessage): Prom
         return;
       }
       const a = parsed.data;
-      const result = gameMgr.submitAccusation(lobbyId, client.playerId, a.suspectId, a.motive, a.method);
-      if (result) {
+      const voteStatus = gameMgr.submitAccusation(lobbyId, client.playerId, a.suspectId, a.motive, a.method, a.evidenceIds);
+      if (voteStatus) {
+        // Broadcast vote status to all players
         broadcastAll(lobbyId, {
-          type: 'accusation:result',
-          data: { playerId: client.playerId, correct: result.correct, score: result.score },
+          type: 'accusation:vote_status',
+          data: { votesReceived: voteStatus.votesReceived, votesNeeded: voteStatus.votesNeeded },
         });
-        if (result.correct) {
+
+        // Check if all players have voted
+        const results = gameMgr.checkAccusationResults(lobbyId);
+        if (results) {
           const game = gameMgr.getGame(lobbyId);
           if (game) {
             broadcastAll(lobbyId, {
-              type: 'game:end',
-              data: { won: true, score: game.score, solution: game.caseData.solution },
-            });
+              type: 'accusation:results',
+              data: { 
+                correct: results.correct, 
+                score: results.score, 
+                culpritId: results.culpritId, 
+                playerVotes: results.playerVotes,
+                solution: game.caseData.solution,
+              },            });
           }
         }
       }

@@ -17,6 +17,10 @@ let chatCleanup: (() => void) | null = null;
 export function setLobbyData(l: LobbyInfo, pid: string): void {
   lobby = l;
   playerId = pid;
+  
+  // Store globally for access in other scenes
+  (globalThis as any).clientPlayerId = pid;
+  (globalThis as any).lobbyData = l;
 }
 
 export function getLobbyData(): { lobby: LobbyInfo | null; playerId: string } {
@@ -89,11 +93,13 @@ function handleLobbyMessage(msg: ServerMessage): void {
   switch (msg.type) {
     case 'lobby:updated':
       lobby = msg.data.lobby;
+      (globalThis as any).lobbyData = lobby;
       updatePlayerList();
       break;
 
     case 'lobby:left':
       lobby = null;
+      (globalThis as any).lobbyData = null;
       if (unsub) { unsub(); unsub = null; }
       showToast('Left lobby');
       navigateTo('play');
