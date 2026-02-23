@@ -618,29 +618,25 @@ function showAccusationModal(): void {
             </div>
             <div class="form-row">
               <label>What was their motive?</label>
-              <select id="acc-motive-select" class="input-select">
+              <select id="acc-motive" class="input-select" required>
                 <option value="">— Choose a motive —</option>
                 <option value="Money / Financial Gain">Money / Financial Gain</option>
                 <option value="Revenge / Jealousy">Revenge / Jealousy</option>
                 <option value="Self-Defense / Protection">Self-Defense / Protection</option>
                 <option value="Crime of Passion">Crime of Passion</option>
                 <option value="Greed / Inheritance">Greed / Inheritance</option>
-                <option value="Other">Other</option>
               </select>
-              <input type="text" id="acc-motive" class="input" placeholder="Specify motive..." style="margin-top: 8px;">
             </div>
             <div class="form-row">
               <label>How did they commit the crime?</label>
-              <select id="acc-method-select" class="input-select">
+              <select id="acc-method" class="input-select" required>
                 <option value="">— Choose a method —</option>
                 <option value="Poison">Poison</option>
                 <option value="Blunt Force Trauma">Blunt Force Trauma</option>
                 <option value="Stabbing">Stabbing</option>
                 <option value="Shooting">Shooting</option>
                 <option value="Accident / Negligence">Accident / Negligence</option>
-                <option value="Other">Other</option>
               </select>
-              <input type="text" id="acc-method" class="input" placeholder="Specify method..." style="margin-top: 8px;">
             </div>
             <div class="form-row">
               <label>Supporting Evidence (Optional)</label>
@@ -661,36 +657,20 @@ function showAccusationModal(): void {
   `;
 
   if (!hasVoted) {
-    // Motive select auto-fill
-    const motiveSelect = document.getElementById('acc-motive-select') as HTMLSelectElement;
-    const motiveInput = document.getElementById('acc-motive') as HTMLInputElement;
-    if (motiveSelect && motiveInput) {
-      motiveSelect.addEventListener('change', () => {
-        if (motiveSelect.value && motiveSelect.value !== 'Other') {
-          motiveInput.value = motiveSelect.value;
-        }
-      });
-    }
-
-    // Method select auto-fill
-    const methodSelect = document.getElementById('acc-method-select') as HTMLSelectElement;
-    const methodInput = document.getElementById('acc-method') as HTMLInputElement;
-    if (methodSelect && methodInput) {
-      methodSelect.addEventListener('change', () => {
-        if (methodSelect.value && methodSelect.value !== 'Other') {
-          methodInput.value = methodSelect.value;
-        }
-      });
-    }
-
     document.getElementById('acc-cancel')!.addEventListener('click', () => {
       const overlay = document.getElementById('overlay-container')!;
       overlay.innerHTML = '';
     });
     document.getElementById('acc-submit')!.addEventListener('click', () => {
       const suspectId = (document.getElementById('acc-suspect') as HTMLSelectElement).value;
-      const motive = (document.getElementById('acc-motive') as HTMLInputElement).value.trim() || 'Unknown motive';
-      const method = (document.getElementById('acc-method') as HTMLInputElement).value.trim() || 'Unknown method';
+      const motive = (document.getElementById('acc-motive') as HTMLSelectElement).value.trim();
+      const method = (document.getElementById('acc-method') as HTMLSelectElement).value.trim();
+      
+      if (!motive || !method) {
+        showToast('Please select both motive and method.');
+        return;
+      }
+      
       const checkboxes = document.querySelectorAll('#acc-evidence input:checked');
       const evidenceIds = Array.from(checkboxes).map(cb => (cb as HTMLInputElement).value);
 
