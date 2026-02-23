@@ -331,6 +331,17 @@ async function handleMessage(client: ClientSocket, message: ClientMessage): Prom
       break;
     }
 
+    case 'interview:leave_vote': {
+      const { lobbyId, vote } = message.data;
+      const total = lobbyMgr.getConnectedPlayerCount(lobbyId);
+      const result = gameMgr.voteInterviewLeave(lobbyId, client.playerId, vote, total);
+      broadcastAll(lobbyId, { type: 'interview:leave_vote_update', data: { votes: result.votes, needed: total } });
+      if (result.allVoted && result.passed) {
+        broadcastAll(lobbyId, { type: 'interview:ended' });
+      }
+      break;
+    }
+
     case 'evidence:discover': {
       const { lobbyId, evidenceId } = message.data;
       const ev = gameMgr.discoverEvidence(lobbyId, evidenceId, client.playerId);
@@ -339,7 +350,9 @@ async function handleMessage(client: ClientSocket, message: ClientMessage): Prom
         gameMgr.updateGame(lobbyId, (state) => {
           state.score = Math.max(0, state.score - 10);
         });
-        broadcastAll(lobbyId, { type: 'evidence:discovered', data: { evidenceId, discoveredBy: client.displayName } });
+        const game = gameMgr.getGame(lobbyId);
+        const score = game?.score ?? 0;
+        broadcastAll(lobbyId, { type: 'evidence:discovered', data: { evidenceId, discoveredBy: client.displayName, score } });
       }
       break;
     }
@@ -355,7 +368,7 @@ async function handleMessage(client: ClientSocket, message: ClientMessage): Prom
           // Deduct 10 points for investigation
           game.score = Math.max(0, game.score - 10);
         }
-        broadcastAll(lobbyId, { type: 'timeline:updated', data: { timeline: game.caseData.timeline, discoveredIds: game.discoveredTimelineIds } });
+        broadcastAll(lobbyId, { type: 'timeline:updated', data: { timeline: game.caseData.timeline, discoveredIds: game.discoveredTimelineIds, score: game.score } });
       }
       break;
     }

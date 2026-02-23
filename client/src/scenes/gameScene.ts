@@ -130,6 +130,10 @@ function handleGameMessage(msg: ServerMessage): void {
       updateInterviewVote(msg.data.votes, msg.data.needed);
       break;
 
+    case 'interview:leave_vote_update':
+      updateInterviewLeaveVote(msg.data.votes, msg.data.needed);
+      break;
+
     case 'interview:start':
       gameStore.updatePhase('interview');
       showInterview(msg.data.suspectId);
@@ -161,7 +165,7 @@ function handleGameMessage(msg: ServerMessage): void {
       break;
 
     case 'timeline:updated':
-      gameStore.updateTimeline(msg.data.timeline, msg.data.discoveredIds);
+      gameStore.updateTimeline(msg.data.timeline, msg.data.discoveredIds, msg.data.score);
       break;
 
     case 'board:op_applied':
@@ -169,7 +173,7 @@ function handleGameMessage(msg: ServerMessage): void {
       break;
 
     case 'evidence:discovered':
-      gameStore.discoverEvidence(msg.data.evidenceId);
+      gameStore.discoverEvidence(msg.data.evidenceId, msg.data.score);
       showToast(`Evidence discovered by ${msg.data.discoveredBy}!`);
       playSfx('sfx_evidence_glow');
       break;
@@ -320,6 +324,14 @@ function updateInterviewVote(votes: Record<string, boolean>, needed: number): vo
   }
 }
 
+function updateInterviewLeaveVote(votes: Record<string, boolean>, needed: number): void {
+  const el = document.getElementById('leave-vote-status');
+  if (el) {
+    const count = Object.values(votes).filter(v => v).length;
+    el.textContent = `${count}/${needed} agreed to leave`;
+  }
+}
+
 function showInterview(suspectId: string): void {
   const state = gameStore.getState();
   if (!state) return;
@@ -338,6 +350,7 @@ function showInterviewLeaveVote(): void {
   const overlay = document.getElementById('overlay-container')!;
   const voteOverlay = document.createElement('div');
   voteOverlay.className = 'modal-overlay';
+  voteOverlay.id = 'interview-leave-vote-overlay';
   voteOverlay.innerHTML = `
     <div class="modal">
       <h3>End Interview?</h3>
@@ -352,10 +365,10 @@ function showInterviewLeaveVote(): void {
   overlay.appendChild(voteOverlay);
 
   document.getElementById('vote-leave-yes')!.addEventListener('click', () => {
-    net.endInterview(gameStore.getLobbyId());
-    voteOverlay.remove();
+    net.voteInterviewLeave(gameStore.getLobbyId(), true);
   });
   document.getElementById('vote-leave-no')!.addEventListener('click', () => {
+    net.voteInterviewLeave(gameStore.getLobbyId(), false);
     voteOverlay.remove();
   });
 }

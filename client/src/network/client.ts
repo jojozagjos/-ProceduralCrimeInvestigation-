@@ -143,6 +143,10 @@ export function endInterview(lobbyId: string): void {
   sendRaw({ type: 'interview:end', data: { lobbyId } });
 }
 
+export function voteInterviewLeave(lobbyId: string, vote: boolean): void {
+  sendRaw({ type: 'interview:leave_vote', data: { lobbyId, vote } });
+}
+
 export function discoverEvidence(lobbyId: string, evidenceId: string): void {
   sendRaw({ type: 'evidence:discover', data: { lobbyId, evidenceId } });
 }

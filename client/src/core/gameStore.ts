@@ -133,17 +133,30 @@ class GameStore {
     this.notify();
   }
 
-  updateTimeline(timeline: TimelineEvent[], discoveredIds: string[]): void {
+  updateTimeline(timeline: TimelineEvent[], discoveredIds: string[], score?: number): void {
     if (this.state) {
       this.state.caseData.timeline = timeline;
       this.state.discoveredTimelineIds = discoveredIds;
+      if (score !== undefined) {
+        this.state.score = score;
+      }
       this.notify();
     }
   }
 
-  discoverEvidence(evidenceId: string): void {
+  discoverEvidence(evidenceId: string, score?: number): void {
     if (this.state && !this.state.discoveredEvidenceIds.includes(evidenceId)) {
       this.state.discoveredEvidenceIds.push(evidenceId);
+      if (score !== undefined) {
+        this.state.score = score;
+      }
+      this.notify();
+    }
+  }
+
+  updateScore(score: number): void {
+    if (this.state) {
+      this.state.score = score;
       this.notify();
     }
   }

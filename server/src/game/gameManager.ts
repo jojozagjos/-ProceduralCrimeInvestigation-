@@ -36,6 +36,7 @@ export function createGame(lobby: LobbyInfo): GameState {
     cinematicSkipVotes: [],
     currentInterviewSuspectId: undefined,
     interviewVotes: {},
+    interviewLeaveVotes: {},
     interviewLog: [],
     accusations: [],
     accusationVotes: {},
@@ -198,7 +199,34 @@ export function endInterview(lobbyId: string): void {
     s.phase = 'investigation';
     s.currentInterviewSuspectId = undefined;
     s.interviewVotes = {};
+    s.interviewLeaveVotes = {};
   });
+}
+
+export function voteInterviewLeave(lobbyId: string, playerId: string, vote: boolean, totalPlayers: number): { passed: boolean; allVoted: boolean; votes: Record<string, boolean> } {
+  const state = games.get(lobbyId);
+  if (!state) return { passed: false, allVoted: false, votes: {} };
+
+  state.interviewLeaveVotes[playerId] = vote;
+  const voteValues = Object.values(state.interviewLeaveVotes);
+  const allVoted = voteValues.length >= totalPlayers;
+
+  if (allVoted) {
+    const passed = voteValues.every(v => v);
+    if (passed) {
+      // All players agreed to leave
+      state.phase = 'investigation';
+      state.currentInterviewSuspectId = undefined;
+      state.interviewVotes = {};
+      state.interviewLeaveVotes = {};
+    } else {
+      // Not all players agreed, reset votes and continue interview
+      state.interviewLeaveVotes = {};
+    }
+    return { passed, allVoted: true, votes: state.interviewLeaveVotes };
+  }
+
+  return { passed: false, allVoted: false, votes: state.interviewLeaveVotes };
 }
 
 export function applyBoardOp(lobbyId: string, op: BoardOp): BoardOp | undefined {

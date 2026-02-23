@@ -266,6 +266,7 @@ export interface GameState {
   cinematicSkipVotes: string[];
   currentInterviewSuspectId?: string;
   interviewVotes: Record<string, boolean>;
+  interviewLeaveVotes: Record<string, boolean>;
   interviewLog: { question: string; answer: string; category: InterviewCategory }[];
   accusations: { playerId: string; suspectId: string; correct: boolean }[];
   accusationVotes: Record<string, { suspectId: string; motive: string; method: string; evidenceIds: string[] }>;
@@ -288,6 +289,7 @@ export type ClientMessage =
   | { type: 'interview:vote'; data: { lobbyId: string; vote: boolean } }
   | { type: 'interview:answer'; data: { lobbyId: string; category: InterviewCategory; evidenceId?: string } }
   | { type: 'interview:end'; data: { lobbyId: string } }
+  | { type: 'interview:leave_vote'; data: { lobbyId: string; vote: boolean } }
   | { type: 'timeline:op'; data: { lobbyId: string; op: 'discover'; eventId: string } }
   | { type: 'board:op'; data: { lobbyId: string; op: BoardOp } }
   | { type: 'accusation:submit'; data: { lobbyId: string; accusation: z.infer<typeof AccusationSchema> } }
@@ -328,13 +330,14 @@ export type ServerMessage =
   | { type: 'cinematic:end' }
   | { type: 'interview:requested'; data: { suspectId: string; requesterId: string; requesterName: string } }
   | { type: 'interview:vote_update'; data: { votes: Record<string, boolean>; needed: number } }
+  | { type: 'interview:leave_vote_update'; data: { votes: Record<string, boolean>; needed: number } }
   | { type: 'interview:start'; data: { suspectId: string } }
   | { type: 'interview:response'; data: { question: string; answer: string; category: InterviewCategory } }
   | { type: 'interview:ended' }
-  | { type: 'timeline:updated'; data: { timeline: TimelineEvent[]; discoveredIds: string[] } }
+  | { type: 'timeline:updated'; data: { timeline: TimelineEvent[]; discoveredIds: string[]; score?: number } }
   | { type: 'board:updated'; data: { board: BoardState } }
   | { type: 'board:op_applied'; data: { op: BoardOp } }
-  | { type: 'evidence:discovered'; data: { evidenceId: string; discoveredBy: string } }
+  | { type: 'evidence:discovered'; data: { evidenceId: string; discoveredBy: string; score?: number } }
   | { type: 'accusation:vote_status'; data: { votesReceived: number; votesNeeded: number } }
   | { type: 'accusation:results'; data: { correct: boolean; score: number; culpritId: string; playerVotes: Record<string, { suspectId: string; correct: boolean }>; solution: GameState['caseData']['solution'] } }
   | { type: 'game:end'; data: { won: boolean; score: number; solution: GameState['caseData']['solution'] } }
