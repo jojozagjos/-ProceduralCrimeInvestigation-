@@ -2,15 +2,22 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import http from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { setupWebSocket } from './network/wsHandler.js';
 import * as lobbyMgr from './lobby/lobbyManager.js';
 import { getDailySeed } from './daily/dailySeed.js';
 import { generateCase } from './case/caseGenerator.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '4000', 10);
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Serve static client files
+const clientDistPath = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientDistPath));
 
 // ─── HTTP Endpoints ──────────────────────────────────────────────────────────
 
@@ -44,6 +51,11 @@ app.get('/api/daily-case', (_req, res) => {
 // Health
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', version: '1.0.0' });
+});
+
+// SPA fallback: serve index.html for all unmatched routes
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(clientDistPath, 'index.html'));
 });
 
 // ─── Server Start ────────────────────────────────────────────────────────────
