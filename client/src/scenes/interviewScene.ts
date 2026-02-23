@@ -88,20 +88,28 @@ export function renderInterviewScene(
   document.querySelectorAll('[data-cat]').forEach(btn => {
     btn.addEventListener('click', () => {
       const cat = (btn as HTMLElement).getAttribute('data-cat') as InterviewCategory;
-      addQuestionToLog(cat);
-      net.sendInterviewAnswer(gameStore.getLobbyId(), cat);
+      if (cat) {
+        addQuestionToLog(cat);
+        net.sendInterviewAnswer(gameStore.getLobbyId(), cat);
+      }
     });
   });
 
   // Vote to leave interview
-  document.getElementById('btn-vote-leave-interview')!.addEventListener('click', () => {
-    (window as any).requestInterviewEnd?.();
-  });
+  const voteLeaveBtn = document.getElementById('btn-vote-leave-interview');
+  if (voteLeaveBtn) {
+    voteLeaveBtn.addEventListener('click', () => {
+      (window as any).requestInterviewEnd?.();
+    });
+  }
 
   // Exit/vote to leave button
-  document.getElementById('btn-end-interview')!.addEventListener('click', () => {
-    (window as any).requestInterviewEnd?.();
-  });
+  const endBtn = document.getElementById('btn-end-interview');
+  if (endBtn) {
+    endBtn.addEventListener('click', () => {
+      (window as any).requestInterviewEnd?.();
+    });
+  }
 
   // Render chat
   const chatArea = document.getElementById('interview-chat-area');

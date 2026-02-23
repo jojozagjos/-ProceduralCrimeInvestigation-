@@ -347,7 +347,9 @@ function showInterview(suspectId: string): void {
 }
 
 function showInterviewLeaveVote(): void {
-  const overlay = document.getElementById('overlay-container')!;
+  const overlay = document.getElementById('overlay-container');
+  if (!overlay) return;
+  
   const voteOverlay = document.createElement('div');
   voteOverlay.className = 'modal-overlay';
   voteOverlay.id = 'interview-leave-vote-overlay';
@@ -357,20 +359,33 @@ function showInterviewLeaveVote(): void {
       <p>All players must agree to end the interview.</p>
       <p id="leave-vote-status">Waiting for votes...</p>
       <div class="vote-buttons">
-        <button class="btn btn-secondary" id="vote-leave-no">No, Continue</button>
-        <button class="btn btn-play" id="vote-leave-yes">Yes, End Interview</button>
+        <button class="btn btn-secondary" id="vote-leave-no" disabled>No, Continue</button>
+        <button class="btn btn-play" id="vote-leave-yes" disabled>Yes, End Interview</button>
       </div>
     </div>
   `;
   overlay.appendChild(voteOverlay);
 
-  document.getElementById('vote-leave-yes')!.addEventListener('click', () => {
-    net.voteInterviewLeave(gameStore.getLobbyId(), true);
-  });
-  document.getElementById('vote-leave-no')!.addEventListener('click', () => {
-    net.voteInterviewLeave(gameStore.getLobbyId(), false);
-    voteOverlay.remove();
-  });
+  const yesBtn = document.getElementById('vote-leave-yes') as HTMLButtonElement;
+  const noBtn = document.getElementById('vote-leave-no') as HTMLButtonElement;
+  
+  if (yesBtn) {
+    yesBtn.disabled = false;
+    yesBtn.addEventListener('click', () => {
+      net.voteInterviewLeave(gameStore.getLobbyId(), true);
+      // Disable to prevent multiple clicks
+      yesBtn.disabled = true;
+      if (noBtn) noBtn.disabled = true;
+    });
+  }
+  
+  if (noBtn) {
+    noBtn.disabled = false;
+    noBtn.addEventListener('click', () => {
+      net.voteInterviewLeave(gameStore.getLobbyId(), false);
+      voteOverlay.remove();
+    });
+  }
 }
 
 function hideInterview(): void {
@@ -670,26 +685,40 @@ function showAccusationModal(): void {
   `;
 
   if (!hasVoted) {
-    document.getElementById('acc-cancel')!.addEventListener('click', () => {
-      const overlay = document.getElementById('overlay-container')!;
-      overlay.innerHTML = '';
-    });
-    document.getElementById('acc-submit')!.addEventListener('click', () => {
-      const suspectId = (document.getElementById('acc-suspect') as HTMLSelectElement).value;
-      const motive = (document.getElementById('acc-motive') as HTMLSelectElement).value.trim();
-      const method = (document.getElementById('acc-method') as HTMLSelectElement).value.trim();
-      
-      if (!motive || !method) {
-        showToast('Please select both motive and method.');
-        return;
-      }
-      
-      const checkboxes = document.querySelectorAll('#acc-evidence input:checked');
-      const evidenceIds = Array.from(checkboxes).map(cb => (cb as HTMLInputElement).value);
+    const cancelBtn = document.getElementById('acc-cancel');
+    const submitBtn = document.getElementById('acc-submit');
+    
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        const overlay = document.getElementById('overlay-container');
+        if (overlay) overlay.innerHTML = '';
+      });
+    }
+    
+    if (submitBtn) {
+      submitBtn.addEventListener('click', () => {
+        const suspectSelect = document.getElementById('acc-suspect') as HTMLSelectElement;
+        const motiveSelect = document.getElementById('acc-motive') as HTMLSelectElement;
+        const methodSelect = document.getElementById('acc-method') as HTMLSelectElement;
+        
+        if (!suspectSelect || !motiveSelect || !methodSelect) return;
+        
+        const suspectId = suspectSelect.value;
+        const motive = motiveSelect.value.trim();
+        const method = methodSelect.value.trim();
+        
+        if (!motive || !method) {
+          showToast('Please select both motive and method.');
+          return;
+        }
+        
+        const checkboxes = document.querySelectorAll('#acc-evidence input:checked');
+        const evidenceIds = Array.from(checkboxes).map(cb => (cb as HTMLInputElement).value);
 
-      net.submitAccusation(gameStore.getLobbyId(), suspectId, motive, method, evidenceIds);
-      playSfx('sfx_ui_click');
-    });
+        net.submitAccusation(gameStore.getLobbyId(), suspectId, motive, method, evidenceIds);
+        playSfx('sfx_ui_click');
+      });
+    }
   }
 }
 
@@ -726,7 +755,8 @@ function showAccusationResults(data: { correct: boolean; score: number; culpritI
   const myVote = data.playerVotes[playerId];
   const culprit = state.caseData.suspects.find(s => s.id === data.culpritId);
   
-  const overlay = document.getElementById('overlay-container')!;
+  const overlay = document.getElementById('overlay-container');
+  if (!overlay) return;
   overlay.innerHTML = `
     <div class="vote-screen-overlay results-reveal">
       <div class="vote-screen accusation-results">
@@ -839,7 +869,8 @@ function togglePause(): void {
   }
 }
 
-function escHtml(s: string): string {
+function escHtml(s: string | undefined): string {
+  if (!s) return '';
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
