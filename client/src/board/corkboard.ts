@@ -1024,9 +1024,10 @@ function syncBoard(): void {
   for (const id of existingIds) {
     const sprite = cardSprites.get(id);
     const physics = cardPhysics.get(id);
-    // Don't remove if currently animating deletion
-    if (sprite && !physics?.isDeleting) { 
-      boardContainer.removeChild(sprite); 
+    // Don't remove if currently animating deletion (either physics flag or sprite-level flag)
+    const spriteDeleting = !!(sprite && (sprite as any)._isDeleting);
+    if (sprite && !(physics?.isDeleting || spriteDeleting)) {
+      boardContainer.removeChild(sprite);
       cardSprites.delete(id);
       cardPhysics.delete(id);
     }
@@ -1119,9 +1120,24 @@ function syncBoard(): void {
 }
 
 function startCardDeletion(cardId: string): void {
-  const physics = cardPhysics.get(cardId);
+  let physics = cardPhysics.get(cardId);
   const sprite = cardSprites.get(cardId);
-  if (!physics || !sprite) return;
+  if (!sprite) return;
+  // Ensure physics entry exists so deletion animation runs even if it wasn't initialized earlier
+  if (!physics) {
+    cardPhysics.set(cardId, {
+      vx: 0,
+      vy: 0,
+      oldX: sprite.x,
+      oldY: sprite.y,
+      rotation: 0,
+      targetRotation: 0,
+      angularVelocity: 0,
+      lastX: sprite.x,
+      lastY: sprite.y,
+    });
+    physics = cardPhysics.get(cardId)!;
+  }
   
   // Break all connections to this card IMMEDIATELY
   const state = gameStore.getState();
@@ -1154,6 +1170,9 @@ function startCardDeletion(cardId: string): void {
     }
   }
   
+  // Mark sprite as deleting to prevent external sync from removing it mid-animation
+  (sprite as any)._isDeleting = true;
+
   // Initialize Verlet physics for deletion
   physics.isDeleting = true;
   physics.deleteStartTime = performance.now();
