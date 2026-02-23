@@ -416,7 +416,13 @@ function startPhysicsLight(canvas: HTMLCanvasElement): void {
     ctx.arc(0, 0, 120, 0, Math.PI * 2);
     ctx.fill();
     
-    // Metal base at top (this is where the rope visually connects)
+    // Light bulb shape (pear-shaped) - drawn before metal base so rope goes behind it
+    ctx.fillStyle = 'rgba(255, 220, 150, 0.95)';
+    ctx.beginPath();
+    ctx.ellipse(0, 8, bulbRadius * 0.85, bulbRadius, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Metal base at top (drawn on top so rope connects to it)
     ctx.fillStyle = 'rgba(120, 120, 120, 0.9)';
     ctx.fillRect(-12, -bulbRadius, 24, 12);
     
@@ -430,12 +436,6 @@ function startPhysicsLight(canvas: HTMLCanvasElement): void {
       ctx.lineTo(12, yPos);
       ctx.stroke();
     }
-    
-    // Light bulb shape (pear-shaped)
-    ctx.fillStyle = 'rgba(255, 220, 150, 0.95)';
-    ctx.beginPath();
-    ctx.ellipse(0, 8, bulbRadius * 0.85, bulbRadius, 0, 0, Math.PI * 2);
-    ctx.fill();
     
     // Bulb highlight
     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';

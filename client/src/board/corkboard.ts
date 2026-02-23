@@ -327,7 +327,7 @@ export function renderCorkboard(container: HTMLElement): void {
     e.preventDefault();
     const scale = boardContainer.scale.x;
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.max(0.3, Math.min(3, scale * delta));
+    const newScale = Math.max(0.45, Math.min(3, scale * delta));
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
@@ -595,8 +595,26 @@ export function renderCorkboard(container: HTMLElement): void {
   const unsub = gameStore.subscribe(() => syncBoard());
   syncBoard();
 
+  let currentTextResolution = Math.min(8, Math.max(2, window.devicePixelRatio || 1));
+
   // Animation loop for ropes
   app.ticker.add(() => {
+    const nextTextResolution = Math.min(
+      8,
+      Math.max(2, (window.devicePixelRatio || 1) / Math.max(0.3, boardContainer.scale.x))
+    );
+    if (Math.abs(nextTextResolution - currentTextResolution) > 0.1) {
+      currentTextResolution = nextTextResolution;
+      for (const [, sprite] of cardSprites) {
+        for (const child of sprite.children) {
+          if (child instanceof PIXI.Text) {
+            child.resolution = currentTextResolution;
+            child.updateText();
+          }
+        }
+      }
+    }
+
     ropeGraphics.clear();
     pinOverlay.clear();
     connectionLabelsContainer.removeChildren();
@@ -762,7 +780,7 @@ export function renderCorkboard(container: HTMLElement): void {
           strokeThickness: 3,
         });
         const labelText = new PIXI.Text(connection.label.slice(0, 20), labelStyle);
-        labelText.resolution = 4;
+        labelText.resolution = currentTextResolution;
         labelText.anchor.set(0.5);
         labelText.x = rope.points[mid].x;
         labelText.y = rope.points[mid].y - 10;
@@ -786,33 +804,33 @@ export function renderCorkboard(container: HTMLElement): void {
         const pinY = pin.y;
         
         // Draw rotated pin (simplified - just circles, rotation visual is subtle)
+        pinOverlay.lineStyle(1.6, 0xE55B5B, 0.95 * alpha);
+        pinOverlay.moveTo(pinX, pinY + 3);
+        pinOverlay.lineTo(pinX, pinY + 10);
+        pinOverlay.lineStyle(0);
+
         pinOverlay.beginFill(0xCC3333, alpha);
         pinOverlay.drawCircle(pinX, pinY, 5);
         pinOverlay.endFill();
         pinOverlay.beginFill(0xFFAAAA, alpha);
         pinOverlay.drawCircle(pinX - 1, pinY - 1, 2);
         pinOverlay.endFill();
-
-        pinOverlay.lineStyle(1.6, 0xE55B5B, 0.95 * alpha);
-        pinOverlay.moveTo(pinX, pinY + 3);
-        pinOverlay.lineTo(pinX, pinY + 10);
-        pinOverlay.lineStyle(0);
         continue;
       }
       
       const pinX = card.x;
       const pinY = card.y;
+      pinOverlay.lineStyle(1.6, 0xE55B5B, 0.95);
+      pinOverlay.moveTo(pinX, pinY + 3);
+      pinOverlay.lineTo(pinX, pinY + 10);
+      pinOverlay.lineStyle(0);
+
       pinOverlay.beginFill(0xCC3333);
       pinOverlay.drawCircle(pinX, pinY, 5);
       pinOverlay.endFill();
       pinOverlay.beginFill(0xFFAAAA);
       pinOverlay.drawCircle(pinX - 1, pinY - 1, 2);
       pinOverlay.endFill();
-
-      pinOverlay.lineStyle(1.6, 0xE55B5B, 0.95);
-      pinOverlay.moveTo(pinX, pinY + 3);
-      pinOverlay.lineTo(pinX, pinY + 10);
-      pinOverlay.lineStyle(0);
     }
   });
 }
@@ -1418,7 +1436,7 @@ function updateCardSprite(container: PIXI.Container, card: BoardCard): void {
     tagLabel.x = 6;
     tagLabel.y = CARD_H - 14;
     container.addChild(tagLabel);
-    tagLabel.resolution = 2;
+    tagLabel.resolution = Math.min(8, Math.max(2, window.devicePixelRatio || 1));
   }
 }
 
@@ -1455,8 +1473,8 @@ function drawCardBackground(bg: PIXI.Graphics, card: BoardCard): void {
 function getNoteTextItems(card: BoardCard): NoteTextItem[] {
   if (card.textItems && card.textItems.length > 0) return card.textItems;
   if (card.content) {
-    // Position text below title (title is at ~16px, so start content at ~60px in canvas coords)
-    return [{ id: 'legacy-text', text: card.content, x: 20, y: 60, size: 10, w: 160, h: 70 }];
+    // Position text below title with extra spacing for wrapped titles
+    return [{ id: 'legacy-text', text: card.content, x: 20, y: 90, size: 10, w: 160, h: 90 }];
   }
   return [];
 }
@@ -1478,15 +1496,18 @@ function buildNoteTextSprite(card: BoardCard, item: NoteTextItem): PIXI.Text {
     fill: item.color || '#2a1a0a',
     wordWrap: true,
     wordWrapWidth: (item.w || CARD_W - 10) * scaleX,
+    stroke: '#fff5d6',
+    strokeThickness: Math.max(1, scaleX),
   });
   const text = new PIXI.Text(item.text.slice(0, 200), style);
   text.resolution = 4;
   text.name = `note-text:${item.id}`;
   // Use top-left anchor for legacy evidence cards to prevent overlap
   if (item.id === 'legacy-text') {
+    const legacyY = Math.max(item.y, 90);
     text.anchor.set(0, 0);
     text.x = item.x * scaleX;
-    text.y = item.y * scaleY;
+    text.y = legacyY * scaleY;
   } else {
     // For user-added text, use center anchor with stored top-left position
     text.anchor.set(0.5);
@@ -1754,7 +1775,7 @@ function openCardEditor(card: BoardCard): void {
 
   const textItems: NoteTextItem[] = (card.textItems && card.textItems.length > 0)
     ? card.textItems.map(i => ({ ...i }))
-    : (card.content ? [{ id: 'legacy-text', text: card.content, x: 20, y: 40, w: 160, h: 70, size: 14, color: '#2a1a0a', rotation: 0 }] : []);
+    : (card.content ? [{ id: 'legacy-text', text: card.content, x: 20, y: 90, w: 160, h: 90, size: 10, color: '#2a1a0a', rotation: 0 }] : []);
 
   const imageItems: NoteImageItem[] = (card.imageItems && card.imageItems.length > 0)
     ? card.imageItems.map(i => ({ ...i }))
@@ -1821,8 +1842,9 @@ function openCardEditor(card: BoardCard): void {
       div.contentEditable = 'false';
       div.className = 'note-canvas-item note-text';
       div.textContent = item.text;
+      const legacyY = item.id === 'legacy-text' ? Math.max(item.y, 90) : item.y;
       div.style.left = `${item.x}px`;
-      div.style.top = `${item.y}px`;
+      div.style.top = `${legacyY}px`;
       if (item.w) div.style.width = `${item.w}px`;
       if (item.h) div.style.height = `${item.h}px`;
       div.style.fontSize = `${item.size || 14}px`;
