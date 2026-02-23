@@ -21,7 +21,7 @@ const TUTORIAL_STEPS = [
   },
   {
     title: '📏 Using Tape',
-    text: 'Click the 📏 Tape button to add crime scene tape to your board. Tape works just like notes — you can write on it, draw on it, move it around, and connect it to other items. Perfect for marking sections or adding dramatic flair!',
+    text: 'Click the 📏 Tape button to add label tape to your board. Tape is primarily for labeling items — type text directly onto the tape to create labels for photos, notes, or areas. You can move labels around, edit their text, and connect them to other items.',
   },
   {
     title: '✏️ Drawing Mode',
@@ -161,15 +161,69 @@ function renderVisual(step: number): void {
       break;
 
     case 4: // Tape
-      // Crime scene tape
-      ctx.fillStyle = '#FFD700';
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 2;
-      ctx.fillRect(50, 100, 400, 30);
-      ctx.strokeRect(50, 100, 400, 30);
-      ctx.fillStyle = '#000';
-      ctx.font = 'bold 14px Arial';
-      ctx.fillText('⚠️ CRIME SCENE - DO NOT CROSS ⚠️', 80, 120);
+      // Adhesive tape strips (clear/translucent sticky tape)
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      // draw three tape strips at slight angles over a sample card
+      drawSampleCard(ctx, 150, 60, 'Pinned Note', '#FFFACD');
+
+      const tape = (x: number, y: number, w: number, h: number, angle = 0) => {
+        ctx.save();
+        ctx.translate(x + w / 2, y + h / 2);
+        ctx.rotate((angle * Math.PI) / 180);
+        ctx.translate(-(x + w / 2), -(y + h / 2));
+        // base translucent strip
+        ctx.fillStyle = 'rgba(245, 245, 220, 0.7)';
+        ctx.fillRect(x, y, w, h);
+        // subtle highlight
+        const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+        grad.addColorStop(0, 'rgba(255,255,255,0.15)');
+        grad.addColorStop(0.5, 'rgba(255,255,255,0.06)');
+        grad.addColorStop(1, 'rgba(255,255,255,0.12)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, w, h);
+        // soft edge
+        ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, w, h);
+        ctx.restore();
+      };
+
+      tape(140, 50, 120, 18, -12);
+      // label text on first tape
+      ctx.save();
+      ctx.translate(140 + 120 / 2, 50 + 18 / 2);
+      ctx.rotate((-12 * Math.PI) / 180);
+      ctx.fillStyle = '#2a1a0a';
+      ctx.font = '11px Arial';
+      ctx.fillText('Victim', -36, 6);
+      ctx.restore();
+
+      tape(160, 100, 110, 18, 8);
+      // label text on second tape
+      ctx.save();
+      ctx.translate(160 + 110 / 2, 100 + 18 / 2);
+      ctx.rotate((8 * Math.PI) / 180);
+      ctx.fillStyle = '#2a1a0a';
+      ctx.font = '11px Arial';
+      ctx.fillText('Photo', -28, 6);
+      ctx.restore();
+
+      tape(200, 44, 140, 18, -2);
+      // label text on third tape
+      ctx.save();
+      ctx.translate(200 + 140 / 2, 44 + 18 / 2);
+      ctx.rotate((-2 * Math.PI) / 180);
+      ctx.fillStyle = '#2a1a0a';
+      ctx.font = '11px Arial';
+      ctx.fillText('Important', -38, 6);
+      ctx.restore();
+
+      ctx.restore();
+      // caption
+      ctx.fillStyle = '#2a1a0a';
+      ctx.font = '12px Arial';
+      ctx.fillText('Label tape: add short text labels to mark items', 120, 150);
       break;
 
     case 5: // Drawing

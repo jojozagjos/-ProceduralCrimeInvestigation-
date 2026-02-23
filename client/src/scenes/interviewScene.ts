@@ -2,6 +2,7 @@
 
 import { gameStore } from '../core/gameStore.js';
 import * as net from '../network/client.js';
+import { renderChat } from '../chat/chatWidget.js';
 import { INTERVIEW_CATEGORIES } from '../utils/types.js';
 import type { GameState, InterviewCategory, Evidence } from '../utils/types.js';
 
@@ -21,7 +22,7 @@ export function renderInterviewScene(
     <div class="interview-fullscreen">
       <div class="interview-background"></div>
       
-      <button class="interview-exit-btn" id="btn-end-interview" title="End Interview">
+      <button class=\"interview-exit-btn\" id=\"btn-end-interview\" title=\"Vote to end interview\">
         <span>✕</span>
       </button>
 
@@ -40,6 +41,8 @@ export function renderInterviewScene(
               <span class="personality-badge">${escHtml(suspect.personality)}</span>
             </div>
           </div>
+          
+          <div id="interview-chat-area" style="margin-top: 20px; flex: 1; min-height: 150px; border-top: 1px solid #ddd; padding-top: 10px;"></div>
         </div>
 
         <div class="interview-right">
@@ -51,7 +54,7 @@ export function renderInterviewScene(
                 <span class="rec-text">Recording</span>
               </div>
             </div>
-            <div class="interview-log" id="interview-log">
+            <div class="interview-log" id="interview-log" style="height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
               <div class="interview-entry system">
                 <span class="system-icon">📋</span>
                 <em>Interview with ${escHtml(suspect.name)} has begun. Choose a line of questioning.</em>
@@ -71,19 +74,10 @@ export function renderInterviewScene(
                 </button>
               `).join('')}
             </div>
-
-            ${discoveredEvidence.length > 0 ? `
-              <div class="evidence-ask">
-                <h4>🔬 Present Evidence</h4>
-                <div class="evidence-ask-controls">
-                  <select id="evidence-select" class="input-select evidence-select">
-                    <option value="">— Select evidence to present —</option>
-                    ${discoveredEvidence.map(e => `<option value="${e.id}">${escHtml(e.title)}</option>`).join('')}
-                  </select>
-                  <button class="btn btn-evidence" id="btn-ask-evidence">Present</button>
-                </div>
-              </div>
-            ` : ''}
+            
+            <div class="interview-actions">
+              <button class="btn btn-sm" id="btn-vote-leave-interview" title="Vote to end interview (requires all players to agree)">🚪 Vote to Leave</button>
+            </div>
           </div>
         </div>
       </div>
@@ -99,23 +93,21 @@ export function renderInterviewScene(
     });
   });
 
-  // Evidence question
-  const askEvBtn = document.getElementById('btn-ask-evidence');
-  if (askEvBtn) {
-    askEvBtn.addEventListener('click', () => {
-      const sel = document.getElementById('evidence-select') as HTMLSelectElement;
-      const evidenceId = sel.value;
-      if (evidenceId) {
-        addQuestionToLog('explain_evidence', evidenceId);
-        net.sendInterviewAnswer(gameStore.getLobbyId(), 'explain_evidence', evidenceId);
-      }
-    });
-  }
-
-  // End interview
-  document.getElementById('btn-end-interview')!.addEventListener('click', () => {
-    net.endInterview(gameStore.getLobbyId());
+  // Vote to leave interview
+  document.getElementById('btn-vote-leave-interview')!.addEventListener('click', () => {
+    (window as any).requestInterviewEnd?.();
   });
+
+  // Exit/vote to leave button
+  document.getElementById('btn-end-interview')!.addEventListener('click', () => {
+    (window as any).requestInterviewEnd?.();
+  });
+
+  // Render chat
+  const chatArea = document.getElementById('interview-chat-area');
+  if (chatArea) {
+    renderChat(chatArea, gameStore.getLobbyId(), false);
+  }
 }
 
 function addQuestionToLog(category: InterviewCategory, evidenceId?: string): void {

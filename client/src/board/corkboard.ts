@@ -609,7 +609,7 @@ export function renderCorkboard(container: HTMLElement): void {
         for (const child of sprite.children) {
           if (child instanceof PIXI.Text) {
             child.resolution = currentTextResolution;
-            child.updateText();
+            child.updateText(true);
           }
         }
       }
@@ -617,7 +617,7 @@ export function renderCorkboard(container: HTMLElement): void {
 
     ropeGraphics.clear();
     pinOverlay.clear();
-    connectionLabelsContainer.removeChildren();
+    connectionLabelsContainer.removeChildren(0, connectionLabelsContainer.children.length);
     
     // Update card rotation physics
     for (const [cardId, physics] of cardPhysics) {

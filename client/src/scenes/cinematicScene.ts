@@ -79,7 +79,7 @@ export function renderCinematic(
       activeImage = nextImage;
     }
 
-    // Animate caption with a typewriter effect
+    // Animate caption with a typewriter effect (slower by default)
     captionEl.style.opacity = '0';
     if (typeTimer) {
       window.clearInterval(typeTimer);
@@ -89,7 +89,10 @@ export function renderCinematic(
       window.clearTimeout(typeDelayTimer);
       typeDelayTimer = null;
     }
-    const delay = settings.reducedMotion ? 0 : 200;
+    // Speed factor applied to panel duration and typing pacing
+    const speedFactor = 1.6; // >1 slows the cinematic; adjust as needed
+
+    const delay = settings.reducedMotion ? 0 : 500;
     typeDelayTimer = window.setTimeout(() => {
       captionEl.textContent = '';
       captionEl.style.opacity = '1';
@@ -98,6 +101,7 @@ export function renderCinematic(
         return;
       }
       let i = 0;
+      const charInterval = 44; // milliseconds per character (slower)
       typeTimer = window.setInterval(() => {
         i += 1;
         captionEl.textContent = p.caption.slice(0, i);
@@ -105,21 +109,23 @@ export function renderCinematic(
           if (typeTimer) window.clearInterval(typeTimer);
           typeTimer = null;
         }
-      }, 22);
+      }, charInterval);
     }, delay);
 
     // Progress bar
-    const totalDuration = panels.reduce((sum, pp) => sum + pp.duration, 0);
-    const elapsed = panels.slice(0, index).reduce((sum, pp) => sum + pp.duration, 0);
-    barEl.style.width = `${((elapsed + p.duration) / totalDuration) * 100}%`;
-    barEl.style.transition = `width ${p.duration}ms linear`;
+    // Apply the same speedFactor to visual progress so bar matches timing
+    const totalDuration = panels.reduce((sum, pp) => sum + pp.duration * speedFactor, 0);
+    const elapsed = panels.slice(0, index).reduce((sum, pp) => sum + pp.duration * speedFactor, 0);
+    const panelEffective = p.duration * speedFactor;
+    barEl.style.width = `${((elapsed + panelEffective) / totalDuration) * 100}%`;
+    barEl.style.transition = `width ${panelEffective}ms linear`;
 
     // Next panel
     if (index < panels.length - 1) {
       setTimeout(() => {
         currentPanel++;
         showPanel(currentPanel);
-      }, p.duration);
+      }, p.duration * speedFactor);
     }
   }
 

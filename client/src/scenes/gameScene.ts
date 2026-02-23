@@ -32,7 +32,7 @@ export function renderGameScene(container: HTMLElement): () => void {
           <span class="time-phase-badge" id="time-badge"></span>
         </div>
         <div class="topbar-right">
-          <span class="score-display" id="score-display"></span>
+          <span class="score-display" id="score-display" title="Investigation Score"></span>
           <button class="btn btn-sm" id="btn-evidence-panel">Evidence</button>
           <button class="btn btn-sm" id="btn-suspects-panel">Suspects</button>
           <button class="btn btn-sm" id="btn-timeline-panel">Timeline</button>
@@ -327,6 +327,37 @@ function showInterview(suspectId: string): void {
 
   const overlay = document.getElementById('overlay-container')!;
   renderInterviewScene(overlay, suspectId, state);
+  
+  // Setup voting to leave interview
+  (window as any).requestInterviewEnd = () => {
+    showInterviewLeaveVote();
+  };
+}
+
+function showInterviewLeaveVote(): void {
+  const overlay = document.getElementById('overlay-container')!;
+  const voteOverlay = document.createElement('div');
+  voteOverlay.className = 'modal-overlay';
+  voteOverlay.innerHTML = `
+    <div class="modal">
+      <h3>End Interview?</h3>
+      <p>All players must agree to end the interview.</p>
+      <p id="leave-vote-status">Waiting for votes...</p>
+      <div class="vote-buttons">
+        <button class="btn btn-secondary" id="vote-leave-no">No, Continue</button>
+        <button class="btn btn-play" id="vote-leave-yes">Yes, End Interview</button>
+      </div>
+    </div>
+  `;
+  overlay.appendChild(voteOverlay);
+
+  document.getElementById('vote-leave-yes')!.addEventListener('click', () => {
+    net.endInterview(gameStore.getLobbyId());
+    voteOverlay.remove();
+  });
+  document.getElementById('vote-leave-no')!.addEventListener('click', () => {
+    voteOverlay.remove();
+  });
 }
 
 function hideInterview(): void {
@@ -587,11 +618,29 @@ function showAccusationModal(): void {
             </div>
             <div class="form-row">
               <label>What was their motive?</label>
-              <input type="text" id="acc-motive" class="input" placeholder="Money? Revenge? Jealousy?">
+              <select id="acc-motive-select" class="input-select">
+                <option value="">— Choose a motive —</option>
+                <option value="Money / Financial Gain">Money / Financial Gain</option>
+                <option value="Revenge / Jealousy">Revenge / Jealousy</option>
+                <option value="Self-Defense / Protection">Self-Defense / Protection</option>
+                <option value="Crime of Passion">Crime of Passion</option>
+                <option value="Greed / Inheritance">Greed / Inheritance</option>
+                <option value="Other">Other</option>
+              </select>
+              <input type="text" id="acc-motive" class="input" placeholder="Specify motive..." style="margin-top: 8px;">
             </div>
             <div class="form-row">
               <label>How did they commit the crime?</label>
-              <input type="text" id="acc-method" class="input" placeholder="Poison? Weapon? Accident?">
+              <select id="acc-method-select" class="input-select">
+                <option value="">— Choose a method —</option>
+                <option value="Poison">Poison</option>
+                <option value="Blunt Force Trauma">Blunt Force Trauma</option>
+                <option value="Stabbing">Stabbing</option>
+                <option value="Shooting">Shooting</option>
+                <option value="Accident / Negligence">Accident / Negligence</option>
+                <option value="Other">Other</option>
+              </select>
+              <input type="text" id="acc-method" class="input" placeholder="Specify method..." style="margin-top: 8px;">
             </div>
             <div class="form-row">
               <label>Supporting Evidence (Optional)</label>
@@ -602,6 +651,7 @@ function showAccusationModal(): void {
               </div>
             </div>
             <div class="vote-actions">
+              <button class="btn btn-secondary" id="acc-cancel">Cancel</button>
               <button class="btn btn-vote" id="acc-submit">Submit My Vote</button>
             </div>
           </div>
@@ -611,6 +661,32 @@ function showAccusationModal(): void {
   `;
 
   if (!hasVoted) {
+    // Motive select auto-fill
+    const motiveSelect = document.getElementById('acc-motive-select') as HTMLSelectElement;
+    const motiveInput = document.getElementById('acc-motive') as HTMLInputElement;
+    if (motiveSelect && motiveInput) {
+      motiveSelect.addEventListener('change', () => {
+        if (motiveSelect.value && motiveSelect.value !== 'Other') {
+          motiveInput.value = motiveSelect.value;
+        }
+      });
+    }
+
+    // Method select auto-fill
+    const methodSelect = document.getElementById('acc-method-select') as HTMLSelectElement;
+    const methodInput = document.getElementById('acc-method') as HTMLInputElement;
+    if (methodSelect && methodInput) {
+      methodSelect.addEventListener('change', () => {
+        if (methodSelect.value && methodSelect.value !== 'Other') {
+          methodInput.value = methodSelect.value;
+        }
+      });
+    }
+
+    document.getElementById('acc-cancel')!.addEventListener('click', () => {
+      const overlay = document.getElementById('overlay-container')!;
+      overlay.innerHTML = '';
+    });
     document.getElementById('acc-submit')!.addEventListener('click', () => {
       const suspectId = (document.getElementById('acc-suspect') as HTMLSelectElement).value;
       const motive = (document.getElementById('acc-motive') as HTMLInputElement).value.trim() || 'Unknown motive';
@@ -716,7 +792,9 @@ function showAccusationResults(data: { correct: boolean; score: number; culpritI
   `;
 
   document.getElementById('btn-return-lobby')!.addEventListener('click', () => {
+    overlay.innerHTML = '';
     gameStore.clear();
+    playMusic('music_investigation');
     navigateTo('play');
   });
 }
@@ -747,6 +825,7 @@ function showGameEnd(data: { won: boolean; score: number; solution: GameState['c
   `;
 
   document.getElementById('btn-return-menu')!.addEventListener('click', () => {
+    overlay.innerHTML = '';
     gameStore.clear();
     net.disconnect();
     navigateTo('main-menu');
