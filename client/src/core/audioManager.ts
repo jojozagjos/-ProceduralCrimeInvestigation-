@@ -45,15 +45,25 @@ function getAudio(name: SoundName): HTMLAudioElement {
 }
 
 export function playMusic(name: SoundName): void {
-  if (currentMusicName === name) return;
-  stopMusic();
   const settings = getSettings();
-  if (settings.muteAll) return;
+  if (settings.muteAll) {
+    stopMusic();
+    return;
+  }
+
+  // If different music is playing, stop it first
+  if (currentMusicName !== name) {
+    stopMusic();
+  } else if (currentMusic && !currentMusic.paused) {
+    // Same music is already playing, don't restart
+    return;
+  }
 
   try {
     const audio = getAudio(name);
     audio.loop = true;
-    audio.volume = settings.musicVolume * (settings.muteAll ? 0 : 1);
+    audio.volume = settings.musicVolume;
+    audio.currentTime = 0;
     audio.play().catch(() => { /* placeholder may not exist */ });
     currentMusic = audio;
     currentMusicName = name;
