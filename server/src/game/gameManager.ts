@@ -96,13 +96,9 @@ export function startTimeCompression(
       s.timePhase = TIME_PHASES[s.timePhaseIndex];
       onPhaseChange(lobbyId, s.timePhase, s.timePhaseIndex);
 
-      // Discover timeline events for this phase
-      s.caseData.timeline.forEach(t => {
-        if (t.phase === s.timePhase && !s.discoveredTimelineIds.includes(t.id)) {
-          s.discoveredTimelineIds.push(t.id);
-          t.discovered = true;
-        }
-      });
+      // Note: Timeline events are now discovered through manual investigation only,
+      // not automatically when time advances. This allows players to strategically
+      // investigate events in each phase rather than having all events revealed.
 
       if (s.timePhaseIndex < TIME_PHASES.length - 1) {
         timePhaseTimers.set(lobbyId, setTimeout(advancePhase, TIME_PHASE_DURATION_MS));

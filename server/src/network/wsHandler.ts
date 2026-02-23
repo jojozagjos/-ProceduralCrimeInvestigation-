@@ -335,6 +335,10 @@ async function handleMessage(client: ClientSocket, message: ClientMessage): Prom
       const { lobbyId, evidenceId } = message.data;
       const ev = gameMgr.discoverEvidence(lobbyId, evidenceId, client.playerId);
       if (ev) {
+        // Deduct 10 points for investigation
+        gameMgr.updateGame(lobbyId, (state) => {
+          state.score = Math.max(0, state.score - 10);
+        });
         broadcastAll(lobbyId, { type: 'evidence:discovered', data: { evidenceId, discoveredBy: client.displayName } });
       }
       break;
@@ -348,6 +352,8 @@ async function handleMessage(client: ClientSocket, message: ClientMessage): Prom
           game.discoveredTimelineIds.push(eventId);
           const evt = game.caseData.timeline.find(t => t.id === eventId);
           if (evt) evt.discovered = true;
+          // Deduct 10 points for investigation
+          game.score = Math.max(0, game.score - 10);
         }
         broadcastAll(lobbyId, { type: 'timeline:updated', data: { timeline: game.caseData.timeline, discoveredIds: game.discoveredTimelineIds } });
       }
