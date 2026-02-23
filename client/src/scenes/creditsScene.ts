@@ -37,7 +37,16 @@ export function renderCreditsScene(container: HTMLElement): void {
         </div>
         <div class="credits-section">
           <h3>Audio</h3>
-          <p class="muted">Audio files are placeholders. Replace with your own music and SFX.</p>
+          <ul>
+            <li>Audio from <a href="https://www.epidemicsound.com/" target="_blank" rel="noopener">Epidemic Sound</a></li>
+            <li class="muted">Audio files in this repo are placeholders and may be replaced.</li>
+          </ul>
+        </div>
+        <div class="credits-section">
+          <h3>Team</h3>
+          <ul>
+            <li>Joseph Slade — Creator / Developer</li>
+          </ul>
         </div>
       </div>
     </div>
