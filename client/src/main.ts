@@ -3,6 +3,7 @@
 import { registerScene, navigateTo } from './core/sceneManager.js';
 import { loadSettings } from './utils/settings.js';
 import { applyVisualEffects } from './scenes/settingsScene.js';
+import { renderSplashScene } from './scenes/splashScene.js';
 import { renderMainMenu } from './scenes/mainMenu.js';
 import { renderPlayScene } from './scenes/playScene.js';
 import { renderLobbyScene, setLobbyData } from './scenes/lobbyScene.js';
@@ -19,6 +20,7 @@ loadSettings();
 applyVisualEffects();
 
 // Register all scenes
+registerScene('splash', renderSplashScene);
 registerScene('main-menu', renderMainMenu);
 registerScene('play', renderPlayScene);
 registerScene('lobby', renderLobbyScene);
@@ -34,5 +36,5 @@ net.onMessage((msg: ServerMessage) => {
   }
 });
 
-// Start at main menu
-navigateTo('main-menu', false);
+// Start at splash screen
+navigateTo('splash', false);

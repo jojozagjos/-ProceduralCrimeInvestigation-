@@ -4,8 +4,29 @@ import type { ServerMessage, BoardOp, InterviewCategory, EvidenceTag } from '../
 
 type MessageHandler = (msg: ServerMessage) => void;
 
-const WS_URL = (import.meta as any).env?.VITE_WS_URL || 'ws://localhost:4000';
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:4000';
+// Dynamically construct URLs based on environment
+function getWsUrl(): string {
+  if ((import.meta as any).env?.VITE_WS_URL) {
+    return (import.meta as any).env.VITE_WS_URL;
+  }
+  
+  // For production on Render, convert https to wss
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return `${protocol}//${host}`;
+}
+
+function getApiUrl(): string {
+  if ((import.meta as any).env?.VITE_API_URL) {
+    return (import.meta as any).env.VITE_API_URL;
+  }
+  
+  // Use current origin for API calls
+  return window.location.origin;
+}
+
+const WS_URL = getWsUrl();
+const API_URL = getApiUrl();
 
 let ws: WebSocket | null = null;
 let handlers: MessageHandler[] = [];
