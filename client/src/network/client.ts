@@ -10,7 +10,12 @@ function getWsUrl(): string {
     return (import.meta as any).env.VITE_WS_URL;
   }
   
-  // For production on Render, convert https to wss
+  // Localhost development: connect to port 4000
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'ws://localhost:4000';
+  }
+  
+  // Production: convert https to wss, use current host
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
   return `${protocol}//${host}`;
@@ -21,7 +26,12 @@ function getApiUrl(): string {
     return (import.meta as any).env.VITE_API_URL;
   }
   
-  // Use current origin for API calls
+  // Localhost development: use port 4000
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:4000';
+  }
+  
+  // Production: use current origin
   return window.location.origin;
 }
 

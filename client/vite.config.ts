@@ -18,8 +18,8 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_PEXELS_KEY': JSON.stringify(process.env.VITE_PEXELS_KEY ?? ''),
     'import.meta.env.VITE_UNSPLASH_KEY': JSON.stringify(process.env.VITE_UNSPLASH_KEY ?? ''),
-    'import.meta.env.VITE_WS_URL': JSON.stringify(process.env.VITE_WS_URL ?? 'ws://localhost:4000'),
-    'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL ?? 'http://localhost:4000'),
+    'import.meta.env.VITE_WS_URL': JSON.stringify(process.env.VITE_WS_URL ?? ''),
+    'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL ?? ''),
   },
   build: {
     outDir: 'dist',
