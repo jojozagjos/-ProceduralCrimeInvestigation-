@@ -609,19 +609,20 @@ function renderSuspectsPanel(el: HTMLElement, state: GameState): void {
 
 function renderPlayersPanel(el: HTMLElement, state: GameState): void {
   const currentPlayerId = gameStore.getPlayerId();
+  const connectedPlayers = state.players.filter(p => p.connected);
   
   el.innerHTML = `
     <div class="panel players-panel">
       <h3>Investigators</h3>
       <div class="players-list">
-        ${state.players.map(p => `
-          <div class="player-card ${p.id === currentPlayerId ? 'current-player' : ''} ${!p.connected ? 'disconnected' : ''}">
-            <div class="player-status ${p.connected ? 'connected' : 'disconnected'}">
+        ${connectedPlayers.map(p => `
+          <div class="player-card ${p.id === currentPlayerId ? 'current-player' : ''}">
+            <div class="player-status connected">
               <span class="status-dot"></span>
             </div>
             <div class="player-info">
               <div class="player-name">${escHtml(p.displayName)}<span class="player-tag">${p.id === currentPlayerId ? ' (You)' : ''}</span></div>
-              <div class="player-status-text">${p.connected ? 'Connected' : 'Disconnected'}</div>
+              <div class="player-status-text">Connected</div>
             </div>
           </div>
         `).join('')}
