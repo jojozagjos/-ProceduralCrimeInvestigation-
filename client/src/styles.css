@@ -1482,6 +1482,83 @@ textarea.input {
   border-radius: 3px;
 }
 
+/* ─── Players Panel ───────────────────────────────────────────────────────── */
+
+.players-panel {
+  padding: 0;
+}
+
+.players-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.player-card {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.6rem;
+  transition: background-color var(--transition);
+}
+
+.player-card.current-player {
+  background: rgba(192, 144, 64, 0.15);
+  border-color: var(--accent);
+}
+
+.player-card.disconnected {
+  opacity: 0.6;
+}
+
+.player-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-dark);
+  border: 2px solid var(--border);
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #4a0;
+  box-shadow: 0 0 8px rgba(68, 170, 0, 0.4);
+}
+
+.player-card.disconnected .status-dot {
+  background: #a44;
+  box-shadow: 0 0 8px rgba(170, 68, 68, 0.4);
+}
+
+.player-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.player-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.player-tag {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.player-status-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 /* ─── Timeline Panel ──────────────────────────────────────────────────────── */
 
 .timeline-phases {

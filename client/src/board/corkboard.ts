@@ -305,7 +305,7 @@ export function renderCorkboard(container: HTMLElement): void {
   boardContainer.addChild(ropeGraphics);
   
   tapeContainer = new PIXI.Container();
-  tapeContainer.zIndex = 5;
+  tapeContainer.zIndex = 1000;
   boardContainer.addChild(tapeContainer);
 
   pinOverlay = new PIXI.Graphics();

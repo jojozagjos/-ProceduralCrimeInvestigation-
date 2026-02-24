@@ -33,6 +33,7 @@ export function renderGameScene(container: HTMLElement): () => void {
         </div>
         <div class="topbar-right">
           <span class="score-display" id="score-display" title="Investigation Score"></span>
+          <button class="btn btn-sm" id="btn-players-panel">Players</button>
           <button class="btn btn-sm" id="btn-evidence-panel">Evidence</button>
           <button class="btn btn-sm" id="btn-suspects-panel">Suspects</button>
           <button class="btn btn-sm" id="btn-timeline-panel">Timeline</button>
@@ -70,6 +71,7 @@ export function renderGameScene(container: HTMLElement): () => void {
   }
 
   // Topbar buttons
+  document.getElementById('btn-players-panel')!.addEventListener('click', () => toggleSidebar('players'));
   document.getElementById('btn-evidence-panel')!.addEventListener('click', () => toggleSidebar('evidence'));
   document.getElementById('btn-suspects-panel')!.addEventListener('click', () => toggleSidebar('suspects'));
   document.getElementById('btn-timeline-panel')!.addEventListener('click', () => toggleSidebar('timeline'));
@@ -396,7 +398,7 @@ function hideInterview(): void {
 
 // ─── Sidebar Panels ──────────────────────────────────────────────────────────
 
-function toggleSidebar(panel: 'evidence' | 'suspects' | 'timeline'): void {
+function toggleSidebar(panel: 'evidence' | 'suspects' | 'timeline' | 'players'): void {
   const el = document.getElementById('sidebar-panel')!;
   if (el.style.display !== 'none' && el.getAttribute('data-panel') === panel) {
     el.style.display = 'none';
@@ -412,6 +414,7 @@ function toggleSidebar(panel: 'evidence' | 'suspects' | 'timeline'): void {
     case 'evidence': renderEvidencePanel(el, state); break;
     case 'suspects': renderSuspectsPanel(el, state); break;
     case 'timeline': renderTimeline(el, state); break;
+    case 'players': renderPlayersPanel(el, state); break;
   }
 }
 
@@ -602,6 +605,29 @@ function renderSuspectsPanel(el: HTMLElement, state: GameState): void {
       showToast('Interview requested. Waiting for votes...');
     });
   });
+}
+
+function renderPlayersPanel(el: HTMLElement, state: GameState): void {
+  const currentPlayerId = gameStore.getPlayerId();
+  
+  el.innerHTML = `
+    <div class="panel players-panel">
+      <h3>Investigators</h3>
+      <div class="players-list">
+        ${state.players.map(p => `
+          <div class="player-card ${p.id === currentPlayerId ? 'current-player' : ''} ${!p.connected ? 'disconnected' : ''}">
+            <div class="player-status ${p.connected ? 'connected' : 'disconnected'}">
+              <span class="status-dot"></span>
+            </div>
+            <div class="player-info">
+              <div class="player-name">${escHtml(p.displayName)}<span class="player-tag">${p.id === currentPlayerId ? ' (You)' : ''}</span></div>
+              <div class="player-status-text">${p.connected ? 'Connected' : 'Disconnected'}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
 }
 
 // ─── Accusation ──────────────────────────────────────────────────────────────
