@@ -2164,9 +2164,24 @@ function openCardEditor(card: BoardCard): void {
 
   document.getElementById('btn-add-text')!.addEventListener('click', () => {
     const id = `txt_${Math.random().toString(36).slice(2, 8)}`;
-    textItems.push({ id, text: 'Text', x: 20, y: 40, w: 160, h: 70, size: 14, color: '#2a1a0a', rotation: 0 });
+    textItems.push({ id, text: 'Click to edit...', x: 20, y: 40, w: 160, h: 70, size: 14, color: '#2a1a0a', rotation: 0 });
     renderCanvas();
     setSelected('text', id);
+    
+    // Auto-focus for editing
+    setTimeout(() => {
+      const textDiv = noteCanvas.querySelector(`[data-id="${id}"]`) as HTMLDivElement;
+      if (textDiv) {
+        textDiv.contentEditable = 'true';
+        textDiv.focus();
+        textDiv.textContent = '';
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(textDiv);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
+    }, 0);
   });
 
   function addImageFromUrl(url: string, size = 120): void {
@@ -2305,7 +2320,6 @@ function openCardEditor(card: BoardCard): void {
       sendBoardOpWithHistory({ type: 'draw_stroke', cardId: card.id, stroke });
     }
     isDrawing = false;
-    setDrawingActive(false);
   });
   
   drawCanvas.addEventListener('mouseleave', () => {
@@ -2319,32 +2333,19 @@ function openCardEditor(card: BoardCard): void {
       sendBoardOpWithHistory({ type: 'draw_stroke', cardId: card.id, stroke });
     }
     isDrawing = false;
-    setDrawingActive(false);
   });
 
   document.getElementById('draw-pen')!.addEventListener('click', () => { 
-    const wasActive = drawMode === 'pen' && noteCanvas.classList.contains('drawing-active');
-    if (wasActive) {
-      setDrawingActive(false);
-      drawMode = 'pen';
-    } else {
-      drawMode = 'pen'; 
-      brushSize = 3;
-      setDrawingActive(true);
-    }
+    drawMode = 'pen'; 
+    brushSize = 3;
+    setDrawingActive(true);
     updateDrawButtons();
   });
   
   document.getElementById('draw-eraser')!.addEventListener('click', () => { 
-    const wasActive = drawMode === 'eraser' && noteCanvas.classList.contains('drawing-active');
-    if (wasActive) {
-      setDrawingActive(false);
-      drawMode = 'pen';
-    } else {
-      drawMode = 'eraser'; 
-      brushSize = 8;
-      setDrawingActive(true);
-    }
+    drawMode = 'eraser'; 
+    brushSize = 8;
+    setDrawingActive(true);
     updateDrawButtons();
   });
   
@@ -2374,6 +2375,31 @@ function openCardEditor(card: BoardCard): void {
     net.sendBoardOp(gameStore.getLobbyId(), { type: 'unlock_card', cardId: card.id });
     overlay.remove();
   });
+
+  // Add auto-save listeners for title and color
+  const titleInput = document.getElementById('card-title-edit') as HTMLInputElement;
+  const colorInput = document.getElementById('card-color-edit') as HTMLInputElement;
+  
+  const autoSave = () => {
+    const title = titleInput.value;
+    const noteColor = colorInput.value;
+    const content = textItems[0]?.text || '';
+    const tag = (document.getElementById('card-tag-edit') as HTMLSelectElement).value || undefined;
+    sendBoardOpWithHistory({
+      type: 'update_card',
+      cardId: card.id,
+      content,
+      title,
+      tag: tag as any,
+      noteColor,
+      textItems: textItems.length ? textItems : undefined,
+      imageItems: imageItems.length ? imageItems : undefined,
+      imageUrl: undefined,
+    });
+  };
+  
+  titleInput?.addEventListener('change', autoSave);
+  colorInput?.addEventListener('change', autoSave);
 
   document.getElementById('card-cancel')!.addEventListener('click', () => {
     net.sendBoardOp(gameStore.getLobbyId(), { type: 'unlock_card', cardId: card.id });
@@ -2729,9 +2755,24 @@ function openTapeEditor(tape: BoardTape): void {
 
   document.getElementById('btn-add-tape-text')!.addEventListener('click', () => {
     const id = `text_${Math.random().toString(36).slice(2, 8)}`;
-    textItems.push({ id, text: 'Text', x: 20, y: 30, w: 60, h: 20, size: 12, color: '#2a1a0a', rotation: 0 });
+    textItems.push({ id, text: 'Click to edit...', x: 20, y: 30, w: 60, h: 20, size: 12, color: '#2a1a0a', rotation: 0 });
     renderCanvas();
     setSelected(id);
+    
+    // Auto-focus for editing
+    setTimeout(() => {
+      const textDiv = tapeCanvas.querySelector(`[data-id="${id}"]`) as HTMLDivElement;
+      if (textDiv) {
+        textDiv.contentEditable = 'true';
+        textDiv.focus();
+        textDiv.textContent = '';
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(textDiv);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
+    }, 0);
   });
 
   renderCanvas();
@@ -2821,7 +2862,6 @@ function openTapeEditor(tape: BoardTape): void {
       sendBoardOpWithHistory({ type: 'draw_tape_stroke', tapeId: tape.id, stroke });
     }
     isDrawing = false;
-    setDrawingActive(false);
   });
 
   drawCanvas.addEventListener('mouseleave', () => {
@@ -2834,26 +2874,19 @@ function openTapeEditor(tape: BoardTape): void {
       sendBoardOpWithHistory({ type: 'draw_tape_stroke', tapeId: tape.id, stroke });
     }
     isDrawing = false;
-    setDrawingActive(false);
   });
 
   document.getElementById('draw-tape-pen')!.addEventListener('click', () => {
-    if (drawMode === 'pen' && tapeCanvas.classList.contains('drawing-active')) {
-      setDrawingActive(false);
-    } else {
-      drawMode = 'pen';
-      setDrawingActive(true);
-    }
+    drawMode = 'pen';
+    brushSize = 2;
+    setDrawingActive(true);
     updateDrawButtons();
   });
 
   document.getElementById('draw-tape-eraser')!.addEventListener('click', () => {
-    if (drawMode === 'eraser' && tapeCanvas.classList.contains('drawing-active')) {
-      setDrawingActive(false);
-    } else {
-      drawMode = 'eraser';
-      setDrawingActive(true);
-    }
+    drawMode = 'eraser';
+    brushSize = 8;
+    setDrawingActive(true);
     updateDrawButtons();
   });
 
