@@ -73,12 +73,14 @@ export function renderSettingsScene(container: HTMLElement): void {
     goBack();
   });
 
-  // Real-time slider labels
+  // Real-time slider labels and audio updates
   const sliders: [string, string][] = [['set-ambient', 'ambient-val'], ['set-music', 'music-val'], ['set-sfx', 'sfx-val']];
   for (const [sliderId, labelId] of sliders) {
     document.getElementById(sliderId)!.addEventListener('input', (e) => {
       const val = parseFloat((e.target as HTMLInputElement).value);
       document.getElementById(labelId)!.textContent = `${Math.round(val * 100)}%`;
+      // Apply settings in real-time
+      applySettings();
     });
   }
 
@@ -86,6 +88,8 @@ export function renderSettingsScene(container: HTMLElement): void {
   document.getElementById('set-mute')!.addEventListener('change', (e) => {
     const muted = (e.target as HTMLInputElement).checked;
     setMute(muted);
+    // Save mute setting in real-time
+    applySettings();
   });
 }
 
