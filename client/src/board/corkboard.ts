@@ -271,16 +271,18 @@ export function renderCorkboard(container: HTMLElement): void {
   cardSprites.clear();
   ropeSimulations.clear();
 
-  app = new PIXI.Application({
-    width: container.clientWidth || 900,
-    height: container.clientHeight || 600,
-    backgroundColor: 0x8B6914,
-    antialias: true,
-    resolution: window.devicePixelRatio || 1,
-    autoDensity: true,
-  });
+  // Defer app creation until container has been laid out
+  requestAnimationFrame(() => {
+    app = new PIXI.Application({
+      width: container.clientWidth || 900,
+      height: container.clientHeight || 600,
+      backgroundColor: 0x8B6914,
+      antialias: true,
+      resolution: window.devicePixelRatio || 1,
+      autoDensity: true,
+    });
 
-  container.appendChild(app.view as HTMLCanvasElement);
+    container.appendChild(app.view as HTMLCanvasElement);
 
   // Corkboard background
   const bg = new PIXI.Graphics();
@@ -832,6 +834,7 @@ export function renderCorkboard(container: HTMLElement): void {
       pinOverlay.drawCircle(pinX - 1, pinY - 1, 2);
       pinOverlay.endFill();
     }
+  });
   });
 }
 
