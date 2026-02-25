@@ -53,7 +53,7 @@ export class ImageProvider {
 
     // DiceBear fallback (always works, no key needed)
     return {
-      url: `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}`,
+      url: `https://api.dicebear.com/7.x/personas/svg?seed=${encodeURIComponent(seed)}`,
       source: 'dicebear',
     };
   }
