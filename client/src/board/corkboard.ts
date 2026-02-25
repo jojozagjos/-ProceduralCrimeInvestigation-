@@ -295,60 +295,74 @@ export function renderCorkboard(container: HTMLElement): void {
       return;
     }
 
-    // Check if canvas is supported
+    // Test what rendering is available
     const testCanvas = document.createElement('canvas');
-    const testCtx = testCanvas.getContext('2d');
-    if (!testCtx) {
-      console.error('Canvas 2D context not supported');
-      container.innerHTML = '<div style="padding: 20px; color: red;">Your browser does not support HTML5 Canvas. Please use a modern browser.</div>';
+    const has2D = !!testCanvas.getContext('2d');
+    const hasWebGL = !!(testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl'));
+    console.log('Rendering capabilities:', { has2D, hasWebGL });
+
+    if (!has2D && !hasWebGL) {
+      console.error('Neither Canvas 2D nor WebGL supported');
+      container.innerHTML = '<div style="padding: 20px; color: red;">Your browser does not support graphics rendering. Please use a modern browser.</div>';
       return;
     }
 
     try {
-      // Method 1: Let PIXI create its own canvas (usually most reliable)
+      // Create canvas element with explicit context creation
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.style.display = 'block';
+      
+      // Pre-test that we can get a 2D context
+      const ctx2d = canvas.getContext('2d');
+      if (!ctx2d) {
+        throw new Error('Cannot create 2D context');
+      }
+      
+      // Clear the context to ensure it's valid
+      ctx2d.fillStyle = '#8B6914';
+      ctx2d.fillRect(0, 0, width, height);
+      
+      console.log('Canvas 2D context verified, creating PIXI Application');
+      
+      // Try creating PIXI with Canvas2D only (no WebGL attempt)
       app = new PIXI.Application({
+        view: canvas,
         width: width,
         height: height,
         backgroundColor: 0x8B6914,
-      });
+        preference: 'webgl', // Request WebGL but allow fallback
+      } as any);
+      
       console.log('PIXI Application created successfully');
     } catch (error) {
-      console.warn('Method 1 failed, trying with explicit canvas:', error);
+      console.warn('Standard initialization failed:', error);
       try {
-        // Method 2: Pre-create canvas element
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        canvas.style.display = 'block';
-        
+        // Try without specifying a canvas - let PIXI create everything
+        console.log('Trying PIXI with auto-created canvas');
         app = new PIXI.Application({
-          view: canvas,
           width: width,
           height: height,
           backgroundColor: 0x8B6914,
-        });
-        console.log('PIXI Application created with pre-made canvas');
+          preference: 'canvas', // Force Canvas renderer
+        } as any);
+        console.log('PIXI Application created with auto canvas');
       } catch (error2) {
-        console.warn('Method 2 failed, trying with minimal options:', error2);
-        try {
-          // Method 3: Absolute minimal
-          app = new PIXI.Application({
-            width: Math.max(width, 100),
-            height: Math.max(height, 100),
-          });
-          console.log('PIXI Application created with minimal options');
-        } catch (error3) {
-          console.error('All PIXI initialization methods failed:', error3);
-          container.innerHTML = `<div style="padding: 20px; color: red; font-family: monospace;">
-            <strong>Graphics Error</strong><br/>
-            Failed to initialize graphics engine.<br/>
-            Try: 1) Refresh the page<br/>
-            2) Clear browser cache<br/>
-            3) Try a different browser<br/>
-            <small style="color: #666; margin-top: 10px;">Error: ${String(error3).slice(0, 100)}</small>
-          </div>`;
-          return;
-        }
+        console.error('All PIXI initialization attempts failed');
+        console.error('Error 1:', error);
+        console.error('Error 2:', error2);
+        container.innerHTML = `<div style="padding: 20px; color: red; font-family: monospace;">
+          <strong>Unable to Initialize Graphics</strong><br/>
+          Your browser may not support WebGL or Canvas rendering.<br/><br/>
+          <strong>Try this:</strong><br/>
+          1. Disable hardware acceleration in browser settings<br/>
+          2. Update your graphics drivers<br/>
+          3. Try Chrome, Firefox, or Edge instead<br/>
+          4. Disable browser extensions<br/><br/>
+          <small style="color: #999;">Error: ${String(error2).slice(0, 80)}</small>
+        </div>`;
+        return;
       }
     }
 
