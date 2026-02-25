@@ -286,40 +286,86 @@ export function renderCorkboard(container: HTMLElement): void {
       return;
     }
 
+    console.log('Initializing PIXI with dimensions:', { width, height });
+
+    // Check if PIXI is available
+    if (typeof PIXI === 'undefined') {
+      console.error('PIXI is not loaded');
+      container.innerHTML = '<div style="padding: 20px; color: red;">Graphics library not loaded. Please refresh the page.</div>';
+      return;
+    }
+
+    // Check if canvas is supported
+    const testCanvas = document.createElement('canvas');
+    const testCtx = testCanvas.getContext('2d');
+    if (!testCtx) {
+      console.error('Canvas 2D context not supported');
+      container.innerHTML = '<div style="padding: 20px; color: red;">Your browser does not support HTML5 Canvas. Please use a modern browser.</div>';
+      return;
+    }
+
     try {
-      // Create canvas element first before passing to PIXI
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      
+      // Method 1: Let PIXI create its own canvas (usually most reliable)
       app = new PIXI.Application({
-        view: canvas,
         width: width,
         height: height,
         backgroundColor: 0x8B6914,
-        antialias: false,
-        resolution: 1,
-        autoDensity: false,
       });
+      console.log('PIXI Application created successfully');
     } catch (error) {
-      console.warn('Failed with standard options, trying minimal options:', error);
+      console.warn('Method 1 failed, trying with explicit canvas:', error);
       try {
-        // Absolute minimal options
+        // Method 2: Pre-create canvas element
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.style.display = 'block';
+        
         app = new PIXI.Application({
+          view: canvas,
           width: width,
           height: height,
           backgroundColor: 0x8B6914,
         });
-      } catch (fallbackError) {
-        console.error('PIXI Application failed completely:', fallbackError);
-        // Last resort: show error message to user
-        container.innerHTML = '<div style="padding: 20px; color: red;">Failed to initialize graphics. Please refresh the page.</div>';
-        return;
+        console.log('PIXI Application created with pre-made canvas');
+      } catch (error2) {
+        console.warn('Method 2 failed, trying with minimal options:', error2);
+        try {
+          // Method 3: Absolute minimal
+          app = new PIXI.Application({
+            width: Math.max(width, 100),
+            height: Math.max(height, 100),
+          });
+          console.log('PIXI Application created with minimal options');
+        } catch (error3) {
+          console.error('All PIXI initialization methods failed:', error3);
+          container.innerHTML = `<div style="padding: 20px; color: red; font-family: monospace;">
+            <strong>Graphics Error</strong><br/>
+            Failed to initialize graphics engine.<br/>
+            Try: 1) Refresh the page<br/>
+            2) Clear browser cache<br/>
+            3) Try a different browser<br/>
+            <small style="color: #666; margin-top: 10px;">Error: ${String(error3).slice(0, 100)}</small>
+          </div>`;
+          return;
+        }
       }
     }
 
-    if (!app) return;
-    container.appendChild(app.view as HTMLCanvasElement);
+    if (!app) {
+      console.error('App object is still null after initialization');
+      container.innerHTML = '<div style="padding: 20px; color: red;">Failed to create graphics instance.</div>';
+      return;
+    }
+
+    try {
+      container.appendChild(app.view as HTMLCanvasElement);
+      console.log('Canvas appended to container, view dimensions:', app.screen.width, 'x', app.screen.height);
+    } catch (appendError) {
+      console.error('Failed to append canvas to container:', appendError);
+      container.innerHTML = '<div style="padding: 20px; color: red;">Failed to attach graphics to page.</div>';
+      return;
+    }
 
     // Corkboard background
     const bg = new PIXI.Graphics();

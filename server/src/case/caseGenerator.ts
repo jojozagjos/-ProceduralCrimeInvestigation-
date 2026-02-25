@@ -128,7 +128,7 @@ export function generateCase(opts: {
       alibi,
       alibiPhase,
       motive: isGuilty ? solutionMotive : (rng() > 0.5 ? pick(MOTIVES, rng) : 'none apparent'),
-      avatarUrl: `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name)}`,
+      avatarUrl: `https://api.dicebear.com/7.x/personas/svg?seed=${encodeURIComponent(name)}`,
     });
   }
 
