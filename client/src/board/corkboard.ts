@@ -287,28 +287,33 @@ export function renderCorkboard(container: HTMLElement): void {
     }
 
     try {
+      // Create canvas element first before passing to PIXI
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      
       app = new PIXI.Application({
+        view: canvas,
         width: width,
         height: height,
         backgroundColor: 0x8B6914,
-        antialias: true,
-        resolution: window.devicePixelRatio || 1,
-        autoDensity: true,
+        antialias: false,
+        resolution: 1,
+        autoDensity: false,
       });
     } catch (error) {
-      console.warn('Failed with WebGL, trying canvas fallback:', error);
+      console.warn('Failed with standard options, trying minimal options:', error);
       try {
-        // Fallback: canvas only with lower resolution
+        // Absolute minimal options
         app = new PIXI.Application({
           width: width,
           height: height,
           backgroundColor: 0x8B6914,
-          antialias: false,
-          resolution: 1,
-          autoDensity: true,
         });
       } catch (fallbackError) {
         console.error('PIXI Application failed completely:', fallbackError);
+        // Last resort: show error message to user
+        container.innerHTML = '<div style="padding: 20px; color: red;">Failed to initialize graphics. Please refresh the page.</div>';
         return;
       }
     }
