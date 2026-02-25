@@ -271,363 +271,383 @@ export function renderCorkboard(container: HTMLElement): void {
   cardSprites.clear();
   ropeSimulations.clear();
 
-  // Defer app creation until container has been laid out
-  requestAnimationFrame(() => {
-    app = new PIXI.Application({
-      width: container.clientWidth || 900,
-      height: container.clientHeight || 600,
-      backgroundColor: 0x8B6914,
-      antialias: true,
-      resolution: window.devicePixelRatio || 1,
-      autoDensity: true,
-    });
+  // Ensure container has been laid out (force reflow and use setTimeout for safety)
+  const width = container.offsetWidth || 900;
+  const height = container.offsetHeight || 600;
 
+  // Use setTimeout to ensure DOM is fully painted
+  setTimeout(() => {
+    if (app) return; // Already initialized
+    
+    try {
+      app = new PIXI.Application({
+        width: width,
+        height: height,
+        backgroundColor: 0x8B6914,
+        antialias: true,
+        resolution: window.devicePixelRatio || 1,
+        autoDensity: true,
+      });
+    } catch (error) {
+      console.error('Failed to create PIXI Application:', error);
+      // Fallback: create with canvas only and lower resolution
+      app = new PIXI.Application({
+        width: width,
+        height: height,
+        backgroundColor: 0x8B6914,
+        antialias: false,
+        resolution: 1,
+        autoDensity: true,
+      });
+    }
+
+    if (!app) return;
     container.appendChild(app.view as HTMLCanvasElement);
 
-  // Corkboard background
-  const bg = new PIXI.Graphics();
-  bg.beginFill(0x8B6914);
-  bg.drawRect(0, 0, app.screen.width, app.screen.height);
-  bg.endFill();
-
-  // Texture pattern
-  for (let i = 0; i < 200; i++) {
-    bg.beginFill(0x7A5C10, 0.3);
-    bg.drawCircle(Math.random() * app.screen.width, Math.random() * app.screen.height, Math.random() * 3 + 1);
+    // Corkboard background
+    const bg = new PIXI.Graphics();
+    bg.beginFill(0x8B6914);
+    bg.drawRect(0, 0, app.screen.width, app.screen.height);
     bg.endFill();
-  }
-  app.stage.addChild(bg);
 
-  boardContainer = new PIXI.Container();
-  boardContainer.sortableChildren = true;
-  app.stage.addChild(boardContainer);
-
-  ropeGraphics = new PIXI.Graphics();
-  ropeGraphics.zIndex = 200;
-  boardContainer.addChild(ropeGraphics);
-  
-  tapeContainer = new PIXI.Container();
-  tapeContainer.zIndex = 1000;
-  boardContainer.addChild(tapeContainer);
-
-  pinOverlay = new PIXI.Graphics();
-  pinOverlay.zIndex = 300;
-  boardContainer.addChild(pinOverlay);
-
-  let connectionLabelsContainer = new PIXI.Container();
-  connectionLabelsContainer.zIndex = 310;
-  boardContainer.addChild(connectionLabelsContainer);
-
-  // Pan & zoom
-  let panOffset = { x: 0, y: 0 };
-  let isPanning = false;
-  let panStart = { x: 0, y: 0 };
-
-  const canvas = app.view as HTMLCanvasElement;
-
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const scale = boardContainer.scale.x;
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.max(0.45, Math.min(3, scale * delta));
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const worldX = (mouseX - boardContainer.x) / scale;
-    const worldY = (mouseY - boardContainer.y) / scale;
-    boardContainer.scale.set(newScale);
-    boardContainer.x = mouseX - worldX * newScale;
-    boardContainer.y = mouseY - worldY * newScale;
-  });
-
-  canvas.addEventListener('mousedown', (e) => {
-    if (e.button === 0 && (e.target as HTMLElement) === canvas && !isDragging) {
-      isPanning = true;
-      panStart = { x: e.clientX - boardContainer.x, y: e.clientY - boardContainer.y };
+    // Texture pattern
+    for (let i = 0; i < 200; i++) {
+      bg.beginFill(0x7A5C10, 0.3);
+      bg.drawCircle(Math.random() * app.screen.width, Math.random() * app.screen.height, Math.random() * 3 + 1);
+      bg.endFill();
     }
-    if (e.button === 1) {
-      isPanning = true;
-      panStart = { x: e.clientX - boardContainer.x, y: e.clientY - boardContainer.y };
-    }
-  });
+    app.stage.addChild(bg);
 
-  canvas.addEventListener('mousemove', (e) => {
-    // Don't pan if in delete mode or dragging items
-    if (isPanning && !deleteMode) {
-      boardContainer.x = e.clientX - panStart.x;
-      boardContainer.y = e.clientY - panStart.y;
-    }
-    if (dragItem) {
-      const local = boardContainer.toLocal(new PIXI.Point(e.clientX - canvas.getBoundingClientRect().left, e.clientY - canvas.getBoundingClientRect().top));
-      const card = cardSprites.get(dragItem.cardId);
-      if (card) {
-        const relX = local.x - card.x - dragItem.offsetX;
-        const relY = local.y - card.y - dragItem.offsetY;
-        updateNoteItemPosition(dragItem.cardId, dragItem.type, dragItem.itemId, relX, relY);
+    boardContainer = new PIXI.Container();
+    boardContainer.sortableChildren = true;
+    app.stage.addChild(boardContainer);
+
+    ropeGraphics = new PIXI.Graphics();
+    ropeGraphics.zIndex = 200;
+    boardContainer.addChild(ropeGraphics);
+    
+    tapeContainer = new PIXI.Container();
+    tapeContainer.zIndex = 1000;
+    boardContainer.addChild(tapeContainer);
+
+    pinOverlay = new PIXI.Graphics();
+    pinOverlay.zIndex = 300;
+    boardContainer.addChild(pinOverlay);
+
+    let connectionLabelsContainer = new PIXI.Container();
+    connectionLabelsContainer.zIndex = 310;
+    boardContainer.addChild(connectionLabelsContainer);
+
+    // Pan & zoom
+    let panOffset = { x: 0, y: 0 };
+    let isPanning = false;
+    let panStart = { x: 0, y: 0 };
+
+    const canvas = app.view as HTMLCanvasElement;
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const scale = boardContainer.scale.x;
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const newScale = Math.max(0.45, Math.min(3, scale * delta));
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const worldX = (mouseX - boardContainer.x) / scale;
+      const worldY = (mouseY - boardContainer.y) / scale;
+      boardContainer.scale.set(newScale);
+      boardContainer.x = mouseX - worldX * newScale;
+      boardContainer.y = mouseY - worldY * newScale;
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0 && (e.target as HTMLElement) === canvas && !isDragging) {
+        isPanning = true;
+        panStart = { x: e.clientX - boardContainer.x, y: e.clientY - boardContainer.y };
       }
-      return;
-    }
-    if (isDragging && dragTarget) {
-      const local = boardContainer.toLocal(new PIXI.Point(e.clientX - canvas.getBoundingClientRect().left, e.clientY - canvas.getBoundingClientRect().top));
-      const targetX = local.x + dragOffset.x;
-      const targetY = local.y + dragOffset.y;
-      
-      // Direct following without rotation
-      dragTarget.x = targetX;
-      dragTarget.y = targetY;
-
-      // Update rope endpoints with current position (for cards)
-      const cardId = dragTarget.name;
-      if (cardId && !cardId.startsWith('tape_')) {
-        updateRopeEndpoints(cardId, dragTarget.x, dragTarget.y);
+      if (e.button === 1) {
+        isPanning = true;
+        panStart = { x: e.clientX - boardContainer.x, y: e.clientY - boardContainer.y };
       }
-    }
-  });
+    });
 
-  canvas.addEventListener('mouseup', (e) => {
-    isPanning = false;
-    if (dragItem) {
-      commitNoteItemPosition(dragItem.cardId);
-      dragItem = null;
-      return;
-    }
-    if (isDragging && dragTarget) {
-      const tapeId = dragTarget.name;
-      if (tapeId && tapeId.startsWith('tape_')) {
-        // Save tape position
-        sendBoardOpWithHistory({ 
-          type: 'move_tape', 
-          tapeId: tapeId,
-          x: dragTarget.x,
-          y: dragTarget.y
-        });
-      } else {
-        // Card dragging
+    canvas.addEventListener('mousemove', (e) => {
+      // Don't pan if in delete mode or dragging items
+      if (isPanning && !deleteMode) {
+        boardContainer.x = e.clientX - panStart.x;
+        boardContainer.y = e.clientY - panStart.y;
+      }
+      if (dragItem) {
+        const local = boardContainer.toLocal(new PIXI.Point(e.clientX - canvas.getBoundingClientRect().left, e.clientY - canvas.getBoundingClientRect().top));
+        const card = cardSprites.get(dragItem.cardId);
+        if (card) {
+          const relX = local.x - card.x - dragItem.offsetX;
+          const relY = local.y - card.y - dragItem.offsetY;
+          updateNoteItemPosition(dragItem.cardId, dragItem.type, dragItem.itemId, relX, relY);
+        }
+        return;
+      }
+      if (isDragging && dragTarget) {
+        const local = boardContainer.toLocal(new PIXI.Point(e.clientX - canvas.getBoundingClientRect().left, e.clientY - canvas.getBoundingClientRect().top));
+        const targetX = local.x + dragOffset.x;
+        const targetY = local.y + dragOffset.y;
+        
+        // Direct following without rotation
+        dragTarget.x = targetX;
+        dragTarget.y = targetY;
+
+        // Update rope endpoints with current position (for cards)
         const cardId = dragTarget.name;
-        if (cardId) {
-          sendBoardOpWithHistory({ type: 'move_card', cardId, x: dragTarget.x - PIN_X, y: dragTarget.y - PIN_HEAD_Y });
+        if (cardId && !cardId.startsWith('tape_')) {
+          updateRopeEndpoints(cardId, dragTarget.x, dragTarget.y);
         }
       }
-      isDragging = false;
-      dragTarget = null;
-    }
-  });
-  
-  // Global mouseup to always clear drag state (prevents stuck dragging)
-  window.addEventListener('mouseup', () => {
-    if (isDragging) {
-      isDragging = false;
-      dragTarget = null;
-    }
-    isPanning = false;
-  });
+    });
 
-  // Connect mode button (HTML overlay)
-  const toolbar = document.createElement('div');
-  toolbar.className = 'board-toolbar';
-  toolbar.innerHTML = `
-    <button class="btn btn-sm" id="btn-add-note" title="Add Note">📝 Note</button>
-    <button class="btn btn-sm" id="btn-add-image-card" title="Add Image Card">🖼️ Image</button>
-    <button class="btn btn-sm" id="btn-add-tape" title="Add Tape">📎 Tape</button>
-    <button class="btn btn-sm" id="btn-connect" title="Connect or Cut">🔗 Connect</button>
-    <button class="btn btn-sm" id="btn-duplicate" title="Duplicate">📌 Duplicate</button>
-    <button class="btn btn-sm" id="btn-delete" title="Delete Selected">🗑️ Delete</button>
-    <button class="btn btn-sm" id="btn-undo" title="Undo">↩ Undo</button>
-    <button class="btn btn-sm" id="btn-redo" title="Redo">↪ Redo</button>
-  `;
-  container.appendChild(toolbar);
+    canvas.addEventListener('mouseup', (e) => {
+      isPanning = false;
+      if (dragItem) {
+        commitNoteItemPosition(dragItem.cardId);
+        dragItem = null;
+        return;
+      }
+      if (isDragging && dragTarget) {
+        const tapeId = dragTarget.name;
+        if (tapeId && tapeId.startsWith('tape_')) {
+          // Save tape position
+          sendBoardOpWithHistory({ 
+            type: 'move_tape', 
+            tapeId: tapeId,
+            x: dragTarget.x,
+            y: dragTarget.y
+          });
+        } else {
+          // Card dragging
+          const cardId = dragTarget.name;
+          if (cardId) {
+            sendBoardOpWithHistory({ type: 'move_card', cardId, x: dragTarget.x - PIN_X, y: dragTarget.y - PIN_HEAD_Y });
+          }
+        }
+        isDragging = false;
+        dragTarget = null;
+      }
+    });
+    
+    // Global mouseup to always clear drag state (prevents stuck dragging)
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        dragTarget = null;
+      }
+      isPanning = false;
+    });
 
-  const rightToolbar = document.createElement('div');
-  rightToolbar.className = 'board-toolbar-right';
-  rightToolbar.innerHTML = `
-    <button class="btn btn-sm" id="btn-recenter" title="Recenter Board">🎯 Recenter</button>
-  `;
-  container.appendChild(rightToolbar);
+    // Connect mode button (HTML overlay)
+    const toolbar = document.createElement('div');
+    toolbar.className = 'board-toolbar';
+    toolbar.innerHTML = `
+      <button class="btn btn-sm" id="btn-add-note" title="Add Note">📝 Note</button>
+      <button class="btn btn-sm" id="btn-add-image-card" title="Add Image Card">🖼️ Image</button>
+      <button class="btn btn-sm" id="btn-add-tape" title="Add Tape">📎 Tape</button>
+      <button class="btn btn-sm" id="btn-connect" title="Connect or Cut">🔗 Connect</button>
+      <button class="btn btn-sm" id="btn-duplicate" title="Duplicate">📌 Duplicate</button>
+      <button class="btn btn-sm" id="btn-delete" title="Delete Selected">🗑️ Delete</button>
+      <button class="btn btn-sm" id="btn-undo" title="Undo">↩ Undo</button>
+      <button class="btn btn-sm" id="btn-redo" title="Redo">↪ Redo</button>
+    `;
+    container.appendChild(toolbar);
 
-  document.getElementById('btn-add-note')!.addEventListener('click', () => {
-    const card: BoardCard = {
-      id: 'card_' + Math.random().toString(36).slice(2, 10),
-      type: 'note',
-      title: 'Note',
-      content: '',
-      noteColor: '#fffacd',
-      textItems: [],
-      imageItems: [],
-      x: 200 + Math.random() * 300,
-      y: 200 + Math.random() * 200,
-    };
-    sendBoardOpWithHistory({ type: 'add_card', card });
-    playSfx('sfx_pin_drop');
-  });
+    const rightToolbar = document.createElement('div');
+    rightToolbar.className = 'board-toolbar-right';
+    rightToolbar.innerHTML = `
+      <button class="btn btn-sm" id="btn-recenter" title="Recenter Board">🎯 Recenter</button>
+    `;
+    container.appendChild(rightToolbar);
 
-  document.getElementById('btn-add-image-card')!.addEventListener('click', () => {
-    openModal('Add Image', `
-      <div class="form-row">
-        <input type="text" id="modal-image-url" class="input" placeholder="Image URL" />
-      </div>
-    `, 'Add', (overlay) => {
-      const input = overlay.querySelector('#modal-image-url') as HTMLInputElement | null;
-      const url = input?.value.trim() || '';
-      if (!url) return;
-      validateImageUrl(url, () => {
-        const card: BoardCard = {
-          id: 'card_' + Math.random().toString(36).slice(2, 10),
-          type: 'image',
-          title: '',
-          content: '',
-          noteColor: undefined,
-          textItems: [],
-          imageItems: [{ id: `img_${Math.random().toString(36).slice(2, 8)}`, url, ...IMAGE_CARD_ITEM, rotation: 0 }],
-          x: 220 + Math.random() * 280,
-          y: 200 + Math.random() * 200,
-        };
-        sendBoardOpWithHistory({ type: 'add_card', card });
-        playSfx('sfx_pin_drop');
-        overlay.remove();
-      }, () => {
-        showToast('Invalid image URL.');
+    document.getElementById('btn-add-note')!.addEventListener('click', () => {
+      const card: BoardCard = {
+        id: 'card_' + Math.random().toString(36).slice(2, 10),
+        type: 'note',
+        title: 'Note',
+        content: '',
+        noteColor: '#fffacd',
+        textItems: [],
+        imageItems: [],
+        x: 200 + Math.random() * 300,
+        y: 200 + Math.random() * 200,
+      };
+      sendBoardOpWithHistory({ type: 'add_card', card });
+      playSfx('sfx_pin_drop');
+    });
+
+    document.getElementById('btn-add-image-card')!.addEventListener('click', () => {
+      openModal('Add Image', `
+        <div class="form-row">
+          <input type="text" id="modal-image-url" class="input" placeholder="Image URL" />
+        </div>
+      `, 'Add', (overlay) => {
+        const input = overlay.querySelector('#modal-image-url') as HTMLInputElement | null;
+        const url = input?.value.trim() || '';
+        if (!url) return;
+        validateImageUrl(url, () => {
+          const card: BoardCard = {
+            id: 'card_' + Math.random().toString(36).slice(2, 10),
+            type: 'image',
+            title: '',
+            content: '',
+            noteColor: undefined,
+            textItems: [],
+            imageItems: [{ id: `img_${Math.random().toString(36).slice(2, 8)}`, url, ...IMAGE_CARD_ITEM, rotation: 0 }],
+            x: 220 + Math.random() * 280,
+            y: 200 + Math.random() * 200,
+          };
+          sendBoardOpWithHistory({ type: 'add_card', card });
+          playSfx('sfx_pin_drop');
+          overlay.remove();
+        }, () => {
+          showToast('Invalid image URL.');
+        });
       });
     });
-  });
 
-  document.getElementById('btn-add-tape')!.addEventListener('click', () => {
-    const tape: BoardTape = {
-      id: 'tape_' + Math.random().toString(36).slice(2, 10),
-      x: 300 + Math.random() * 400,
-      y: 250 + Math.random() * 250,
-      rotation: (Math.random() - 0.5) * 30, // -15 to +15 degrees
-      color: Math.random() > 0.5 ? '#f5deb3' : '#ffffff', // tan or white
-    };
-    sendBoardOpWithHistory({ type: 'add_tape', tape });
-    playSfx('sfx_ui_click');
-  });
+    document.getElementById('btn-add-tape')!.addEventListener('click', () => {
+      const tape: BoardTape = {
+        id: 'tape_' + Math.random().toString(36).slice(2, 10),
+        x: 300 + Math.random() * 400,
+        y: 250 + Math.random() * 250,
+        rotation: (Math.random() - 0.5) * 30, // -15 to +15 degrees
+        color: Math.random() > 0.5 ? '#f5deb3' : '#ffffff', // tan or white
+      };
+      sendBoardOpWithHistory({ type: 'add_tape', tape });
+      playSfx('sfx_ui_click');
+    });
 
-  document.getElementById('btn-connect')!.addEventListener('click', () => {
-    connectMode = !connectMode;
-    connectFromId = null;
-    const btn = document.getElementById('btn-connect')!;
-    btn.classList.toggle('active', connectMode);
-  });
+    document.getElementById('btn-connect')!.addEventListener('click', () => {
+      connectMode = !connectMode;
+      connectFromId = null;
+      const btn = document.getElementById('btn-connect')!;
+      btn.classList.toggle('active', connectMode);
+    });
 
-  document.getElementById('btn-duplicate')!.addEventListener('click', () => {
-    if (!selectedCardId) {
-      showToast('Select a card to duplicate.');
-      return;
-    }
-    const state = gameStore.getState();
-    const card = state?.board.cards.find(c => c.id === selectedCardId);
-    if (!card) return;
-    const duplicate = sanitizeCard(card);
-    duplicate.id = 'card_' + Math.random().toString(36).slice(2, 10);
-    duplicate.x = card.x + 20;
-    duplicate.y = card.y + 20;
-    sendBoardOpWithHistory({ type: 'add_card', card: duplicate });
-  });
-
-  document.getElementById('btn-delete')!.addEventListener('click', () => {
-    deleteMode = !deleteMode;
-    const btn = document.getElementById('btn-delete')!;
-    btn.classList.toggle('active', deleteMode);
-    if (deleteMode) {
-      // Clear drag state when entering delete mode
-      isDragging = false;
-      dragTarget = null;
-      showToast('Click a card to delete it.');
-    }
-  });
-
-  document.getElementById('btn-undo')!.addEventListener('click', () => {
-    const state = gameStore.getState();
-    if (!state || undoStack.length === 0) return;
-    const snapshot = undoStack.pop()!;
-    redoStack.push(cloneBoardState(state.board));
-    applyBoardSnapshot(snapshot);
-  });
-
-  document.getElementById('btn-redo')!.addEventListener('click', () => {
-    const state = gameStore.getState();
-    if (!state || redoStack.length === 0) return;
-    const snapshot = redoStack.pop()!;
-    undoStack.push(cloneBoardState(state.board));
-    applyBoardSnapshot(snapshot);
-  });
-
-  document.getElementById('btn-recenter')!.addEventListener('click', () => {
-    boardContainer.position.set(0, 0);
-    boardContainer.scale.set(1);
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (isTypingTarget(e.target)) return;
-    const mod = e.ctrlKey || e.metaKey;
-    if (!mod) return;
-    if (e.key.toLowerCase() === 'c') {
-      if (!selectedCardId) return;
+    document.getElementById('btn-duplicate')!.addEventListener('click', () => {
+      if (!selectedCardId) {
+        showToast('Select a card to duplicate.');
+        return;
+      }
       const state = gameStore.getState();
       const card = state?.board.cards.find(c => c.id === selectedCardId);
       if (!card) return;
-      clipboardCard = sanitizeCard(card);
-      return;
-    }
-    if (e.key.toLowerCase() === 'v') {
-      if (!clipboardCard) return;
-      const pasted = sanitizeCard(clipboardCard);
-      pasted.id = 'card_' + Math.random().toString(36).slice(2, 10);
-      pasted.x = (clipboardCard.x || 0) + 20;
-      pasted.y = (clipboardCard.y || 0) + 20;
-      sendBoardOpWithHistory({ type: 'add_card', card: pasted });
-      return;
-    }
-    if (e.key.toLowerCase() === 'z') {
-      if (e.shiftKey) {
-        document.getElementById('btn-redo')?.dispatchEvent(new MouseEvent('click'));
-      } else {
-        document.getElementById('btn-undo')?.dispatchEvent(new MouseEvent('click'));
+      const duplicate = sanitizeCard(card);
+      duplicate.id = 'card_' + Math.random().toString(36).slice(2, 10);
+      duplicate.x = card.x + 20;
+      duplicate.y = card.y + 20;
+      sendBoardOpWithHistory({ type: 'add_card', card: duplicate });
+    });
+
+    document.getElementById('btn-delete')!.addEventListener('click', () => {
+      deleteMode = !deleteMode;
+      const btn = document.getElementById('btn-delete')!;
+      btn.classList.toggle('active', deleteMode);
+      if (deleteMode) {
+        // Clear drag state when entering delete mode
+        isDragging = false;
+        dragTarget = null;
+        showToast('Click a card to delete it.');
       }
-    }
-    if (e.key.toLowerCase() === 'y') {
-      document.getElementById('btn-redo')?.dispatchEvent(new MouseEvent('click'));
-    }
-  });
+    });
 
-  boardContainer.x = app.screen.width / 2 - 450;
-  boardContainer.y = app.screen.height / 2 - 350;
+    document.getElementById('btn-undo')!.addEventListener('click', () => {
+      const state = gameStore.getState();
+      if (!state || undoStack.length === 0) return;
+      const snapshot = undoStack.pop()!;
+      redoStack.push(cloneBoardState(state.board));
+      applyBoardSnapshot(snapshot);
+    });
 
-  // Subscribe to store updates
-  const unsub = gameStore.subscribe(() => syncBoard());
-  syncBoard();
+    document.getElementById('btn-redo')!.addEventListener('click', () => {
+      const state = gameStore.getState();
+      if (!state || redoStack.length === 0) return;
+      const snapshot = redoStack.pop()!;
+      undoStack.push(cloneBoardState(state.board));
+      applyBoardSnapshot(snapshot);
+    });
 
-  let currentTextResolution = Math.min(8, Math.max(2, window.devicePixelRatio || 1));
+    document.getElementById('btn-recenter')!.addEventListener('click', () => {
+      boardContainer.position.set(0, 0);
+      boardContainer.scale.set(1);
+    });
 
-  // Animation loop for ropes
-  app.ticker.add(() => {
-    const nextTextResolution = Math.min(
-      8,
-      Math.max(2, (window.devicePixelRatio || 1) / Math.max(0.3, boardContainer.scale.x))
-    );
-    if (Math.abs(nextTextResolution - currentTextResolution) > 0.1) {
-      currentTextResolution = nextTextResolution;
-      for (const [, sprite] of cardSprites) {
-        for (const child of sprite.children) {
-          if (child instanceof PIXI.Text) {
-            child.resolution = currentTextResolution;
-            child.updateText(true);
+    document.addEventListener('keydown', (e) => {
+      if (isTypingTarget(e.target)) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      if (e.key.toLowerCase() === 'c') {
+        if (!selectedCardId) return;
+        const state = gameStore.getState();
+        const card = state?.board.cards.find(c => c.id === selectedCardId);
+        if (!card) return;
+        clipboardCard = sanitizeCard(card);
+        return;
+      }
+      if (e.key.toLowerCase() === 'v') {
+        if (!clipboardCard) return;
+        const pasted = sanitizeCard(clipboardCard);
+        pasted.id = 'card_' + Math.random().toString(36).slice(2, 10);
+        pasted.x = (clipboardCard.x || 0) + 20;
+        pasted.y = (clipboardCard.y || 0) + 20;
+        sendBoardOpWithHistory({ type: 'add_card', card: pasted });
+        return;
+      }
+      if (e.key.toLowerCase() === 'z') {
+        if (e.shiftKey) {
+          document.getElementById('btn-redo')?.dispatchEvent(new MouseEvent('click'));
+        } else {
+          document.getElementById('btn-undo')?.dispatchEvent(new MouseEvent('click'));
+        }
+      }
+      if (e.key.toLowerCase() === 'y') {
+        document.getElementById('btn-redo')?.dispatchEvent(new MouseEvent('click'));
+      }
+    });
+
+    boardContainer.x = app.screen.width / 2 - 450;
+    boardContainer.y = app.screen.height / 2 - 350;
+
+    // Subscribe to store updates
+    const unsub = gameStore.subscribe(() => syncBoard());
+    syncBoard();
+
+    let currentTextResolution = Math.min(8, Math.max(2, window.devicePixelRatio || 1));
+
+    // Animation loop for ropes
+    app.ticker.add(() => {
+      const nextTextResolution = Math.min(
+        8,
+        Math.max(2, (window.devicePixelRatio || 1) / Math.max(0.3, boardContainer.scale.x))
+      );
+      if (Math.abs(nextTextResolution - currentTextResolution) > 0.1) {
+        currentTextResolution = nextTextResolution;
+        for (const [, sprite] of cardSprites) {
+          for (const child of sprite.children) {
+            if (child instanceof PIXI.Text) {
+              child.resolution = currentTextResolution;
+              child.updateText(true);
+            }
           }
         }
       }
-    }
 
-    ropeGraphics.clear();
-    pinOverlay.clear();
-    connectionLabelsContainer.removeChildren(0, connectionLabelsContainer.children.length);
-    
-    // Update card rotation physics
-    for (const [cardId, physics] of cardPhysics) {
-      const sprite = cardSprites.get(cardId);
-      if (!sprite) continue;
+      ropeGraphics.clear();
+      pinOverlay.clear();
+      connectionLabelsContainer.removeChildren(0, connectionLabelsContainer.children.length);
       
-      // Deletion animation using normal physics
-      if (physics.isDeleting && physics.deleteStartTime) {
+      // Update card rotation physics
+      for (const [cardId, physics] of cardPhysics) {
+        const sprite = cardSprites.get(cardId);
+        if (!sprite) continue;
+        
+        // Deletion animation using normal physics
+        if (physics.isDeleting && physics.deleteStartTime) {
         const elapsed = performance.now() - physics.deleteStartTime;
         const maxDuration = 4000; // 4 seconds for normal fall
         
@@ -835,7 +855,7 @@ export function renderCorkboard(container: HTMLElement): void {
       pinOverlay.endFill();
     }
   });
-  });
+  }, 0); // End setTimeout
 }
 
 const TAPE_W = 80;
@@ -851,14 +871,15 @@ function buildTapeTextSprite(tape: BoardTape, item: NoteTextItem): PIXI.Text {
     fontSize: Math.max(4, (item.size || 12) * scaleX),
     fill: item.color || '#2a1a0a',
     wordWrap: true,
-    wordWrapWidth: TAPE_W - 4,
+    wordWrapWidth: (TAPE_W - 4) / scaleX,
   });
   const text = new PIXI.Text(item.text.slice(0, 50), style);
-  text.resolution = 4;
+  text.resolution = Math.min(8, Math.max(2, window.devicePixelRatio || 1));
   text.name = `tape-text:${item.id}`;
-  text.anchor.set(0.5);
-  text.x = (item.x - TAPE_CANVAS_W / 2) * scaleX;
-  text.y = (item.y - TAPE_CANVAS_H / 2) * scaleY;
+  text.anchor.set(0.5, 0.5);
+  text.x = item.x * scaleX - TAPE_W / 2;
+  text.y = item.y * scaleY - TAPE_H / 2;
+  text.scale.set(scaleX, scaleY);
   text.rotation = ((item.rotation || 0) * Math.PI) / 180;
   return text;
 }
@@ -1839,7 +1860,9 @@ function openCardEditor(card: BoardCard): void {
   function queueLiveCardUpdate(): void {
     if (liveUpdateTimer) clearTimeout(liveUpdateTimer);
     liveUpdateTimer = setTimeout(() => {
-      net.sendBoardOp(gameStore.getLobbyId(), buildCardUpdateOp());
+      const op = buildCardUpdateOp();
+      net.sendBoardOp(gameStore.getLobbyId(), op);
+      sendBoardOpWithHistory(op);
     }, 120);
   }
 
@@ -2379,16 +2402,26 @@ function openCardEditor(card: BoardCard): void {
   });
 
   document.getElementById('draw-pen')!.addEventListener('click', () => { 
-    drawMode = 'pen'; 
-    brushSize = 3;
-    setDrawingActive(true);
+    const isActive = noteCanvas.classList.contains('drawing-active');
+    if (isActive && drawMode === 'pen') {
+      setDrawingActive(false);
+    } else {
+      drawMode = 'pen'; 
+      brushSize = 3;
+      setDrawingActive(true);
+    }
     updateDrawButtons();
   });
   
   document.getElementById('draw-eraser')!.addEventListener('click', () => { 
-    drawMode = 'eraser'; 
-    brushSize = 8;
-    setDrawingActive(true);
+    const isActive = noteCanvas.classList.contains('drawing-active');
+    if (isActive && drawMode === 'eraser') {
+      setDrawingActive(false);
+    } else {
+      drawMode = 'eraser'; 
+      brushSize = 8;
+      setDrawingActive(true);
+    }
     updateDrawButtons();
   });
   
@@ -2936,16 +2969,26 @@ function openTapeEditor(tape: BoardTape): void {
   });
 
   document.getElementById('draw-tape-pen')!.addEventListener('click', () => {
-    drawMode = 'pen';
-    brushSize = 2;
-    setDrawingActive(true);
+    const isActive = tapeCanvas.classList.contains('drawing-active');
+    if (isActive && drawMode === 'pen') {
+      setDrawingActive(false);
+    } else {
+      drawMode = 'pen';
+      brushSize = 2;
+      setDrawingActive(true);
+    }
     updateDrawButtons();
   });
 
   document.getElementById('draw-tape-eraser')!.addEventListener('click', () => {
-    drawMode = 'eraser';
-    brushSize = 8;
-    setDrawingActive(true);
+    const isActive = tapeCanvas.classList.contains('drawing-active');
+    if (isActive && drawMode === 'eraser') {
+      setDrawingActive(false);
+    } else {
+      drawMode = 'eraser';
+      brushSize = 8;
+      setDrawingActive(true);
+    }
     updateDrawButtons();
   });
 
