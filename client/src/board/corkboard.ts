@@ -271,14 +271,21 @@ export function renderCorkboard(container: HTMLElement): void {
   cardSprites.clear();
   ropeSimulations.clear();
 
-  // Ensure container has been laid out (force reflow and use setTimeout for safety)
-  const width = container.offsetWidth || 900;
-  const height = container.offsetHeight || 600;
-
-  // Use setTimeout to ensure DOM is fully painted
-  setTimeout(() => {
+  // Function to attempt PIXI app creation with retries
+  const initializeApp = () => {
     if (app) return; // Already initialized
-    
+
+    // Read dimensions inside setTimeout to ensure layout is complete
+    let width = container.offsetWidth || container.clientWidth || 0;
+    let height = container.offsetHeight || container.clientHeight || 0;
+
+    // If still no dimensions, retry with defaults and visual feedback
+    if (width <= 0 || height <= 0) {
+      console.warn('Container dimensions not ready, retrying...', { width, height });
+      setTimeout(initializeApp, 100);
+      return;
+    }
+
     try {
       app = new PIXI.Application({
         width: width,
@@ -289,16 +296,21 @@ export function renderCorkboard(container: HTMLElement): void {
         autoDensity: true,
       });
     } catch (error) {
-      console.error('Failed to create PIXI Application:', error);
-      // Fallback: create with canvas only and lower resolution
-      app = new PIXI.Application({
-        width: width,
-        height: height,
-        backgroundColor: 0x8B6914,
-        antialias: false,
-        resolution: 1,
-        autoDensity: true,
-      });
+      console.warn('Failed with WebGL, trying canvas fallback:', error);
+      try {
+        // Fallback: canvas only with lower resolution
+        app = new PIXI.Application({
+          width: width,
+          height: height,
+          backgroundColor: 0x8B6914,
+          antialias: false,
+          resolution: 1,
+          autoDensity: true,
+        });
+      } catch (fallbackError) {
+        console.error('PIXI Application failed completely:', fallbackError);
+        return;
+      }
     }
 
     if (!app) return;
@@ -855,7 +867,16 @@ export function renderCorkboard(container: HTMLElement): void {
       pinOverlay.endFill();
     }
   });
-  }, 0); // End setTimeout
+  }; // End initializeApp function
+
+  // Initialize with a small delay to ensure DOM is fully laid out
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(initializeApp, 50);
+    });
+  } else {
+    setTimeout(initializeApp, 0);
+  }
 }
 
 const TAPE_W = 80;
