@@ -54,7 +54,7 @@ export function renderInterviewScene(
                 <span class="rec-text">Recording</span>
               </div>
             </div>
-            <div class="interview-log" id="interview-log" style="height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+            <div class="interview-log" id="interview-log">
               <div class="interview-entry system">
                 <span class="system-icon">📋</span>
                 <em>Interview with ${escHtml(suspect.name)} has begun. Choose a line of questioning.</em>
@@ -89,7 +89,6 @@ export function renderInterviewScene(
     btn.addEventListener('click', () => {
       const cat = (btn as HTMLElement).getAttribute('data-cat') as InterviewCategory;
       if (cat) {
-        addQuestionToLog(cat);
         net.sendInterviewAnswer(gameStore.getLobbyId(), cat);
       }
     });

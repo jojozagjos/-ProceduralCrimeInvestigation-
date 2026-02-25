@@ -156,9 +156,24 @@ function handleGameMessage(msg: ServerMessage): void {
     case 'interview:response': {
       const logEl = document.getElementById('interview-log');
       if (logEl) {
-        const entry = document.createElement('div');
-        entry.className = 'interview-entry response';
-        entry.innerHTML = `
+        // Add question
+        const questionEntry = document.createElement('div');
+        questionEntry.className = 'interview-entry asking';
+        questionEntry.innerHTML = `
+          <div class="entry-bubble investigator">
+            <div class="bubble-icon">👤</div>
+            <div class="bubble-content">
+              <div class="bubble-label">Investigator</div>
+              <div class="q">${escHtml(msg.data.question || 'Question')}</div>
+            </div>
+          </div>
+        `;
+        logEl.appendChild(questionEntry);
+        
+        // Add answer
+        const answerEntry = document.createElement('div');
+        answerEntry.className = 'interview-entry response';
+        answerEntry.innerHTML = `
           <div class="entry-bubble suspect">
             <div class="bubble-icon">💬</div>
             <div class="bubble-content">
@@ -167,7 +182,7 @@ function handleGameMessage(msg: ServerMessage): void {
             </div>
           </div>
         `;
-        logEl.appendChild(entry);
+        logEl.appendChild(answerEntry);
         logEl.scrollTop = logEl.scrollHeight;
       }
       break;
@@ -190,6 +205,7 @@ function handleGameMessage(msg: ServerMessage): void {
       gameStore.discoverEvidence(msg.data.evidenceId, msg.data.score);
       showToast(`Evidence discovered by ${msg.data.discoveredBy}!`);
       playSfx('sfx_evidence_glow');
+      refreshCurrentPanel();
       break;
 
     case 'accusation:vote_status':
@@ -333,10 +349,25 @@ function updateInterviewVote(votes: Record<string, boolean>, needed: number): vo
 }
 
 function updateInterviewLeaveVote(votes: Record<string, boolean>, needed: number): void {
+  const count = Object.values(votes).filter(v => v).length;
+  
+  // Show the modal if it doesn't exist yet
+  if (!document.getElementById('interview-leave-vote-overlay')) {
+    showInterviewLeaveVote();
+  }
+  
   const el = document.getElementById('leave-vote-status');
   if (el) {
-    const count = Object.values(votes).filter(v => v).length;
     el.textContent = `${count}/${needed} agreed to leave`;
+  }
+  
+  // If player already voted, disable buttons
+  const playerId = gameStore.getPlayerId();
+  if (votes[playerId] !== undefined) {
+    const yesBtn = document.getElementById('vote-leave-yes') as HTMLButtonElement;
+    const noBtn = document.getElementById('vote-leave-no') as HTMLButtonElement;
+    if (yesBtn) yesBtn.disabled = true;
+    if (noBtn) noBtn.disabled = true;
   }
 }
 
@@ -417,6 +448,24 @@ function toggleSidebar(panel: 'evidence' | 'suspects' | 'timeline' | 'players'):
   if (!state) return;
 
   switch (panel) {
+    case 'evidence': renderEvidencePanel(el, state); break;
+    case 'suspects': renderSuspectsPanel(el, state); break;
+    case 'timeline': renderTimeline(el, state); break;
+    case 'players': renderPlayersPanel(el, state); break;
+  }
+}
+
+function refreshCurrentPanel(): void {
+  const el = document.getElementById('sidebar-panel');
+  if (!el || el.style.display === 'none') return;
+  
+  const currentPanel = el.getAttribute('data-panel') as 'evidence' | 'suspects' | 'timeline' | 'players' | null;
+  if (!currentPanel) return;
+
+  const state = gameStore.getState();
+  if (!state) return;
+
+  switch (currentPanel) {
     case 'evidence': renderEvidencePanel(el, state); break;
     case 'suspects': renderSuspectsPanel(el, state); break;
     case 'timeline': renderTimeline(el, state); break;

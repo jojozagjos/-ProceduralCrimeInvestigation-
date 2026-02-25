@@ -29,7 +29,7 @@ export function getLobbyData(): { lobby: LobbyInfo | null; playerId: string } {
 
 export function renderLobbyScene(container: HTMLElement): () => void {
   if (!lobby) {
-    navigateTo('play');
+    navigateTo('play', false);
     return () => {};
   }
 
@@ -102,7 +102,7 @@ function handleLobbyMessage(msg: ServerMessage): void {
       (globalThis as any).lobbyData = null;
       if (unsub) { unsub(); unsub = null; }
       showToast('Left lobby');
-      navigateTo('play');
+      navigateTo('play', false);
       break;
 
     case 'lobby:error':
@@ -123,7 +123,7 @@ function handleLobbyMessage(msg: ServerMessage): void {
         lobby = null;
         if (unsub) { unsub(); unsub = null; }
         showToast('Disconnected');
-        navigateTo('play');
+        navigateTo('play', false);
       }
       break;
   }

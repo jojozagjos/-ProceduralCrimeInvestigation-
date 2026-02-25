@@ -548,7 +548,7 @@ export function renderCorkboard(container: HTMLElement): void {
         title: 'Note',
         content: '',
         noteColor: '#fffacd',
-        textItems: [],
+        textItems: [{ id: `txt_${Math.random().toString(36).slice(2, 8)}`, text: 'Click to edit...', x: 20, y: 40, w: 160, h: 70, size: 14, color: '#2a1a0a', rotation: 0 }],
         imageItems: [],
         x: 200 + Math.random() * 300,
         y: 200 + Math.random() * 200,
@@ -1894,10 +1894,6 @@ function openCardEditor(card: BoardCard): void {
           <option value="red_herring" ${card.tag === 'red_herring' ? 'selected' : ''}>Red Herring</option>
         </select>
       </div>
-      <div class="modal-actions">
-        <button class="btn" id="card-cancel">Cancel</button>
-        <button class="btn btn-play" id="card-save">Save</button>
-      </div>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -2034,7 +2030,7 @@ function openCardEditor(card: BoardCard): void {
         queueLiveCardUpdate();
       });
       div.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (e.key === 'Escape') {
           e.preventDefault();
           div.blur();
         }
@@ -2518,40 +2514,17 @@ function openCardEditor(card: BoardCard): void {
   
   updateDrawButtons();
 
-  document.getElementById('card-save')!.addEventListener('click', () => {
-    const title = (document.getElementById('card-title-edit') as HTMLInputElement).value;
-    const noteColor = (document.getElementById('card-color-edit') as HTMLInputElement).value;
-    const content = textItems[0]?.text || '';
-    const tag = (document.getElementById('card-tag-edit') as HTMLSelectElement).value || undefined;
-    sendBoardOpWithHistory({
-      type: 'update_card',
-      cardId: card.id,
-      content,
-      title,
-      tag: tag as any,
-      noteColor,
-      textItems: textItems.length ? textItems : undefined,
-      imageItems: imageItems.length ? imageItems : undefined,
-      imageUrl: undefined,
-    });
-    net.sendBoardOp(gameStore.getLobbyId(), { type: 'unlock_card', cardId: card.id });
-    overlay.remove();
+  // Close editor when clicking overlay background
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      net.sendBoardOp(gameStore.getLobbyId(), { type: 'unlock_card', cardId: card.id });
+      overlay.remove();
+    }
   });
 
-  // Add auto-save listeners for title and color
-  const titleInput = document.getElementById('card-title-edit') as HTMLInputElement;
-  const colorInput = document.getElementById('card-color-edit') as HTMLInputElement;
-  
-  const autoSave = () => {
+  // Add live update listener for tag changes
+  (document.getElementById('card-tag-edit') as HTMLSelectElement).addEventListener('change', () => {
     queueLiveCardUpdate();
-  };
-  
-  titleInput?.addEventListener('change', autoSave);
-  colorInput?.addEventListener('change', autoSave);
-
-  document.getElementById('card-cancel')!.addEventListener('click', () => {
-    net.sendBoardOp(gameStore.getLobbyId(), { type: 'unlock_card', cardId: card.id });
-    overlay.remove();
   });
 }
 
@@ -2603,10 +2576,6 @@ function openTapeEditor(tape: BoardTape): void {
           </div>
         </div>
       </div>
-      <div class="modal-actions">
-        <button class="btn" id="tape-cancel">Cancel</button>
-        <button class="btn btn-play" id="tape-save">Save</button>
-      </div>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -2627,7 +2596,9 @@ function openTapeEditor(tape: BoardTape): void {
   function queueLiveTapeUpdate(): void {
     if (liveTapeUpdateTimer) clearTimeout(liveTapeUpdateTimer);
     liveTapeUpdateTimer = setTimeout(() => {
-      net.sendBoardOp(gameStore.getLobbyId(), buildTapeUpdateOp());
+      const op = buildTapeUpdateOp();
+      net.sendBoardOp(gameStore.getLobbyId(), op);
+      sendBoardOpWithHistory(op);
     }, 120);
   }
   
@@ -2684,7 +2655,7 @@ function openTapeEditor(tape: BoardTape): void {
         queueLiveTapeUpdate();
       });
       div.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (e.key === 'Escape') {
           e.preventDefault();
           div.blur();
         }
@@ -3085,18 +3056,11 @@ function openTapeEditor(tape: BoardTape): void {
 
   updateDrawButtons();
 
-  document.getElementById('tape-save')!.addEventListener('click', () => {
-    sendBoardOpWithHistory({
-      type: 'update_tape',
-      tapeId: tape.id,
-      textItems: textItems.length ? textItems : undefined,
-      drawingStrokes: tape.drawingStrokes,
-    });
-    overlay.remove();
-  });
-
-  document.getElementById('tape-cancel')!.addEventListener('click', () => {
-    overlay.remove();
+  // Close editor when clicking overlay background
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+    }
   });
 }
 

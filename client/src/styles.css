@@ -2447,7 +2447,9 @@ textarea.input {
   background: rgba(255, 255, 255, 0.6);
   box-sizing: border-box;
   white-space: pre-wrap;
-  overflow: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow: auto;
 }
 
 .note-text:focus {
