@@ -137,13 +137,15 @@ function startPhysicsLight(canvas: HTMLCanvasElement): void {
   const ctx = canvas.getContext('2d')!;
   let animId = 0;
   
-  // Chain/rope configuration
-  const chainLength = 14;
-  const segmentLength = 25;
+  // Chain/rope configuration (responsive)
+  let chainLength = 14;
+  let segmentLength = 25;
   const gravity = 0.5;
   const friction = 0.99;
-  const bulbRadius = 35;
-  const bulbLength = bulbRadius * 2; // Length of bulb rigid body
+  let bulbRadius = 35;
+  let bulbLength = bulbRadius * 2; // Length of bulb rigid body
+  let anchorX = 0;
+  let anchorY = -50;
   
   interface Point {
     x: number;
@@ -160,15 +162,28 @@ function startPhysicsLight(canvas: HTMLCanvasElement): void {
   let mouseY = 0;
   let isDragging = false;
   
+  function updateLayout() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const isSmall = width < 900 || height < 700;
+
+    chainLength = isSmall ? 10 : 14;
+    segmentLength = isSmall ? 20 : 25;
+    bulbRadius = isSmall ? 24 : 35;
+    bulbLength = bulbRadius * 2;
+
+    anchorX = isSmall ? width * 0.75 : width / 2;
+    anchorY = isSmall ? -100 : -50;
+  }
+
   function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    updateLayout();
     initChain();
   }
   
   function initChain() {
-    const anchorX = canvas.width / 2;
-    const anchorY = -50;
     
     // Initialize rope points
     ropePoints = [];

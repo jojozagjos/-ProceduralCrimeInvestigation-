@@ -194,6 +194,10 @@ export function submitAccusation(lobbyId: string, suspectId: string, motive: str
   sendRaw({ type: 'accusation:submit', data: { lobbyId, accusation: { suspectId, motive, method, evidenceIds } } });
 }
 
+export function cancelAccusationVote(lobbyId: string): void {
+  sendRaw({ type: 'accusation:cancel', data: { lobbyId } });
+}
+
 // ─── HTTP ────────────────────────────────────────────────────────────────────
 
 export async function fetchLobbies(): Promise<any[]> {

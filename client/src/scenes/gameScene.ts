@@ -11,7 +11,8 @@ import { renderTimeline } from '../timeline/timelinePanel.js';
 import { renderCinematic } from '../scenes/cinematicScene.js';
 import { renderInterviewScene } from '../scenes/interviewScene.js';
 import { renderPauseMenu } from '../ui/pauseMenu.js';
-import type { ServerMessage, GameState } from '../utils/types.js';
+import { getLobbyData } from './lobbyScene.js';
+import type { ServerMessage, GameState, Player } from '../utils/types.js';
 
 let unsub: (() => void) | null = null;
 let storeSub: (() => void) | null = null;
@@ -103,6 +104,17 @@ export function renderGameScene(container: HTMLElement): () => void {
 
 function handleGameMessage(msg: ServerMessage): void {
   switch (msg.type) {
+    case 'lobby:updated': {
+      const lobbyData = msg.data.lobby;
+      (globalThis as any).lobbyData = lobbyData;
+      const panelEl = document.getElementById('sidebar-panel');
+      const state = gameStore.getState();
+      if (panelEl && panelEl.getAttribute('data-panel') === 'players' && state) {
+        renderPlayersPanel(panelEl, state);
+      }
+      break;
+    }
+
     case 'game:state':
       gameStore.setState(msg.data.gameState);
       break;
@@ -252,12 +264,6 @@ function showCaseBrief(): void {
   `;
   document.getElementById('btn-start-investigation')!.addEventListener('click', () => {
     overlay.innerHTML = '';
-    // Auto-discover first few evidence pieces
-    const undiscovered = state.caseData.evidence.filter(e => !state.discoveredEvidenceIds.includes(e.id));
-    const toDiscover = undiscovered.slice(0, 3);
-    for (const ev of toDiscover) {
-      net.discoverEvidence(gameStore.getLobbyId(), ev.id);
-    }
   });
 
   // Manual close only
@@ -607,14 +613,17 @@ function renderSuspectsPanel(el: HTMLElement, state: GameState): void {
   });
 }
 
-function renderPlayersPanel(el: HTMLElement, state: GameState): void {
+function renderPlayersPanel(el: HTMLElement, _state: GameState): void {
   const currentPlayerId = gameStore.getPlayerId();
-  const connectedPlayers = state.players.filter(p => p.connected);
+  const { lobby } = getLobbyData();
+  const players: Player[] = lobby?.players ?? [];
+  const connectedPlayers = players.filter(p => p.connected);
   
   el.innerHTML = `
     <div class="panel players-panel">
       <h3>Investigators</h3>
       <div class="players-list">
+        ${connectedPlayers.length === 0 ? '<div class="muted">No connected players.</div>' : ''}
         ${connectedPlayers.map(p => `
           <div class="player-card ${p.id === currentPlayerId ? 'current-player' : ''}">
             <div class="player-status connected">
@@ -638,7 +647,11 @@ function showAccusationModal(): void {
   if (!state) return;
 
   const playerId = (globalThis as any).clientPlayerId || '';
-  const hasVoted = state.accusationVotes && state.accusationVotes[playerId];
+  const hasVoted = (globalThis as any).accusationVoteSubmitted === true;
+  const voteStatus = (globalThis as any).accusationVoteStatus || {
+    votesReceived: Object.keys(state.accusationVotes || {}).length,
+    votesNeeded: getLobbyPlayerCount(),
+  };
 
   const overlay = document.getElementById('overlay-container')!;
   overlay.innerHTML = `
@@ -656,11 +669,14 @@ function showAccusationModal(): void {
             <p>Waiting for other investigators...</p>
             <div class="vote-progress">
               <div class="vote-progress-text" id="vote-status">
-                ${Object.keys(state.accusationVotes).length} / ${getLobbyPlayerCount()} votes
+                ${voteStatus.votesReceived} / ${voteStatus.votesNeeded} votes
               </div>
               <div class="vote-progress-bar">
-                <div class="vote-progress-fill" style="width: ${(Object.keys(state.accusationVotes).length / getLobbyPlayerCount()) * 100}%"></div>
+                <div class="vote-progress-fill" style="width: ${(voteStatus.votesReceived / voteStatus.votesNeeded) * 100}%"></div>
               </div>
+            </div>
+            <div class="vote-buttons">
+              <button class="btn btn-danger" id="acc-cancel-vote">Cancel Vote</button>
             </div>
           </div>
         ` : `
@@ -743,9 +759,19 @@ function showAccusationModal(): void {
         const evidenceIds = Array.from(checkboxes).map(cb => (cb as HTMLInputElement).value);
 
         net.submitAccusation(gameStore.getLobbyId(), suspectId, motive, method, evidenceIds);
+        (globalThis as any).accusationVoteSubmitted = true;
         playSfx('sfx_ui_click');
       });
     }
+  }
+
+  const cancelVoteBtn = document.getElementById('acc-cancel-vote');
+  if (cancelVoteBtn) {
+    cancelVoteBtn.addEventListener('click', () => {
+      net.cancelAccusationVote(gameStore.getLobbyId());
+      (globalThis as any).accusationVoteSubmitted = false;
+      showAccusationModal();
+    });
   }
 }
 
@@ -756,6 +782,7 @@ function getLobbyPlayerCount(): number {
 }
 
 function updateAccusationVoteStatus(data: { votesReceived: number; votesNeeded: number }): void {
+  (globalThis as any).accusationVoteStatus = data;
   const statusEl = document.getElementById('vote-status');
   const fillEl = document.querySelector('.vote-progress-fill') as HTMLElement;
   
@@ -767,7 +794,7 @@ function updateAccusationVoteStatus(data: { votesReceived: number; votesNeeded: 
   }
 
   // Re-render the vote screen to show waiting state
-  if (data.votesReceived > 0) {
+  if (data.votesReceived >= 0) {
     const state = gameStore.getState();
     if (state) showAccusationModal();
   }
@@ -777,6 +804,9 @@ function showAccusationResults(data: { correct: boolean; score: number; culpritI
   stopMusic();
   const state = gameStore.getState();
   if (!state) return;
+
+  (globalThis as any).accusationVoteSubmitted = false;
+  (globalThis as any).accusationVoteStatus = null;
 
   const playerId = (globalThis as any).clientPlayerId || '';
   const myVote = data.playerVotes[playerId];

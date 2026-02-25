@@ -417,5 +417,17 @@ async function handleMessage(client: ClientSocket, message: ClientMessage): Prom
       }
       break;
     }
+
+    case 'accusation:cancel': {
+      const { lobbyId } = message.data;
+      const voteStatus = gameMgr.cancelAccusationVote(lobbyId, client.playerId);
+      if (voteStatus) {
+        broadcastAll(lobbyId, {
+          type: 'accusation:vote_status',
+          data: { votesReceived: voteStatus.votesReceived, votesNeeded: voteStatus.votesNeeded },
+        });
+      }
+      break;
+    }
   }
 }

@@ -374,6 +374,26 @@ export function submitAccusation(
   return { votesNeeded: totalPlayers, votesReceived };
 }
 
+export function cancelAccusationVote(
+  lobbyId: string,
+  playerId: string,
+): { votesNeeded: number; votesReceived: number } | undefined {
+  const state = games.get(lobbyId);
+  if (!state || state.accusationSubmitted) return undefined;
+
+  if (state.accusationVotes[playerId]) {
+    delete state.accusationVotes[playerId];
+  }
+
+  const lobby = getLobby(lobbyId);
+  if (!lobby) return undefined;
+
+  const totalPlayers = lobby.players.length;
+  const votesReceived = Object.keys(state.accusationVotes).length;
+
+  return { votesNeeded: totalPlayers, votesReceived };
+}
+
 export function checkAccusationResults(
   lobbyId: string,
 ): { correct: boolean; score: number; culpritId: string; playerVotes: Record<string, { suspectId: string; correct: boolean }> } | undefined {

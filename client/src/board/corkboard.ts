@@ -1814,13 +1814,41 @@ function openCardEditor(card: BoardCard): void {
   const selectedLabel = document.getElementById('note-selected-label') as HTMLSpanElement;
   const deleteBtn = document.getElementById('btn-delete-item') as HTMLButtonElement;
 
+  let liveUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function buildCardUpdateOp(): BoardOp {
+    const title = (document.getElementById('card-title-edit') as HTMLInputElement).value;
+    const noteColor = (document.getElementById('card-color-edit') as HTMLInputElement).value;
+    const tag = (document.getElementById('card-tag-edit') as HTMLSelectElement).value || undefined;
+    return {
+      type: 'update_card',
+      cardId: card.id,
+      content: textItems[0]?.text || '',
+      title,
+      tag: tag as any,
+      noteColor,
+      textItems: textItems.length ? textItems : undefined,
+      imageItems: imageItems.length ? imageItems : undefined,
+      imageUrl: undefined,
+    };
+  }
+
+  function queueLiveCardUpdate(): void {
+    if (liveUpdateTimer) clearTimeout(liveUpdateTimer);
+    liveUpdateTimer = setTimeout(() => {
+      net.sendBoardOp(gameStore.getLobbyId(), buildCardUpdateOp());
+    }, 120);
+  }
+
   (document.getElementById('card-color-edit') as HTMLInputElement).addEventListener('input', (e) => {
     const val = (e.target as HTMLInputElement).value;
     noteCanvas.style.background = val;
+    queueLiveCardUpdate();
   });
 
   (document.getElementById('card-title-edit') as HTMLInputElement).addEventListener('input', () => {
     renderCanvas();
+    queueLiveCardUpdate();
   });
 
   function renderCanvas(): void {
@@ -1887,6 +1915,11 @@ function openCardEditor(card: BoardCard): void {
       div.addEventListener('blur', () => {
         div.contentEditable = 'false';
         item.text = div.textContent || '';
+        queueLiveCardUpdate();
+      });
+      div.addEventListener('input', () => {
+        item.text = div.textContent || '';
+        queueLiveCardUpdate();
       });
       div.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -1939,6 +1972,7 @@ function openCardEditor(card: BoardCard): void {
     }
     renderCanvas();
     updateSelectionBox();
+    queueLiveCardUpdate();
   }
 
   function getSelectedElement(): HTMLElement | null {
@@ -2029,7 +2063,11 @@ function openCardEditor(card: BoardCard): void {
     updateSelectionBox();
   });
 
-  window.addEventListener('mouseup', () => { draggingItem = null; });
+  window.addEventListener('mouseup', () => {
+    const hadDrag = draggingItem !== null;
+    draggingItem = null;
+    if (hadDrag) queueLiveCardUpdate();
+  });
 
   let rotateHandleActive = false;
   let scaleHandle: string | null = null;
@@ -2143,8 +2181,10 @@ function openCardEditor(card: BoardCard): void {
   });
 
   window.addEventListener('mouseup', () => {
+    const hadTransform = rotateHandleActive || scaleHandle !== null;
     rotateHandleActive = false;
     scaleHandle = null;
+    if (hadTransform) queueLiveCardUpdate();
   });
 
   deleteBtn.addEventListener('click', () => {
@@ -2381,21 +2421,7 @@ function openCardEditor(card: BoardCard): void {
   const colorInput = document.getElementById('card-color-edit') as HTMLInputElement;
   
   const autoSave = () => {
-    const title = titleInput.value;
-    const noteColor = colorInput.value;
-    const content = textItems[0]?.text || '';
-    const tag = (document.getElementById('card-tag-edit') as HTMLSelectElement).value || undefined;
-    sendBoardOpWithHistory({
-      type: 'update_card',
-      cardId: card.id,
-      content,
-      title,
-      tag: tag as any,
-      noteColor,
-      textItems: textItems.length ? textItems : undefined,
-      imageItems: imageItems.length ? imageItems : undefined,
-      imageUrl: undefined,
-    });
+    queueLiveCardUpdate();
   };
   
   titleInput?.addEventListener('change', autoSave);
@@ -2464,6 +2490,24 @@ function openTapeEditor(tape: BoardTape): void {
   document.body.appendChild(overlay);
 
   const textItems: NoteTextItem[] = tape.textItems ? tape.textItems.map(i => ({ ...i })) : [];
+
+  let liveTapeUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function buildTapeUpdateOp(): BoardOp {
+    return {
+      type: 'update_tape',
+      tapeId: tape.id,
+      textItems: textItems.length ? textItems : undefined,
+      drawingStrokes: tape.drawingStrokes,
+    };
+  }
+
+  function queueLiveTapeUpdate(): void {
+    if (liveTapeUpdateTimer) clearTimeout(liveTapeUpdateTimer);
+    liveTapeUpdateTimer = setTimeout(() => {
+      net.sendBoardOp(gameStore.getLobbyId(), buildTapeUpdateOp());
+    }, 120);
+  }
   
   const tapeCanvas = document.getElementById('tape-canvas') as HTMLDivElement;
   const drawCanvas = document.getElementById('tape-draw-canvas') as HTMLCanvasElement;
@@ -2511,6 +2555,11 @@ function openTapeEditor(tape: BoardTape): void {
       div.addEventListener('blur', () => {
         div.contentEditable = 'false';
         item.text = div.textContent || '';
+        queueLiveTapeUpdate();
+      });
+      div.addEventListener('input', () => {
+        item.text = div.textContent || '';
+        queueLiveTapeUpdate();
       });
       div.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -2555,6 +2604,7 @@ function openTapeEditor(tape: BoardTape): void {
     fontSizeLabel.textContent = `${item.size}px`;
     renderCanvas();
     updateSelectionBox();
+    queueLiveTapeUpdate();
   }
 
   function getSelectedElement(): HTMLElement | null {
@@ -2635,7 +2685,11 @@ function openTapeEditor(tape: BoardTape): void {
     updateSelectionBox();
   });
 
-  window.addEventListener('mouseup', () => { draggingItem = null; });
+  window.addEventListener('mouseup', () => {
+    const hadDrag = draggingItem !== null;
+    draggingItem = null;
+    if (hadDrag) queueLiveTapeUpdate();
+  });
 
   let rotateHandleActive = false;
   let scaleHandle: string | null = null;
@@ -2741,8 +2795,10 @@ function openTapeEditor(tape: BoardTape): void {
   });
 
   window.addEventListener('mouseup', () => {
+    const hadTransform = rotateHandleActive || scaleHandle !== null;
     rotateHandleActive = false;
     scaleHandle = null;
+    if (hadTransform) queueLiveTapeUpdate();
   });
 
   deleteBtn.addEventListener('click', () => {

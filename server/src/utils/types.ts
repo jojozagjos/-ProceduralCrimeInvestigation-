@@ -293,6 +293,7 @@ export type ClientMessage =
   | { type: 'timeline:op'; data: { lobbyId: string; op: 'discover'; eventId: string } }
   | { type: 'board:op'; data: { lobbyId: string; op: BoardOp } }
   | { type: 'accusation:submit'; data: { lobbyId: string; accusation: z.infer<typeof AccusationSchema> } }
+  | { type: 'accusation:cancel'; data: { lobbyId: string } }
   | { type: 'evidence:discover'; data: { lobbyId: string; evidenceId: string } }
   | { type: 'ping' };
 
