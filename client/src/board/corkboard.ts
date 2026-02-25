@@ -1834,7 +1834,10 @@ function openCardEditor(card: BoardCard): void {
   overlay.className = 'card-editor-overlay';
   overlay.innerHTML = `
     <div class="card-editor">
-      <h3>Edit Card</h3>
+      <div class="card-editor-header">
+        <h3>Edit Card</h3>
+        <button class="btn-editor-close" id="btn-editor-close" title="Close editor (all changes save automatically)">✕</button>
+      </div>
       <div class="note-canvas-toolbar">
         <div class="note-canvas-actions">
           <button class="btn btn-xs" id="btn-add-text">Add Text</button>
@@ -1874,6 +1877,8 @@ function openCardEditor(card: BoardCard): void {
               <span id="note-selected-label" class="muted">None</span>
             </div>
             <div class="form-row" id="note-text-controls" style="display:none;">
+              <label>Text Content</label>
+              <textarea id="note-text-content" class="input" rows="4" placeholder="Type text here..."></textarea>
               <label>Text Color</label>
               <input type="color" id="note-font-color" value="#2a1a0a" />
               <label>Text Size</label>
@@ -1914,6 +1919,7 @@ function openCardEditor(card: BoardCard): void {
   let selected: { type: 'text' | 'image'; id: string } | null = null;
 
   const fontControls = document.getElementById('note-text-controls') as HTMLDivElement;
+  const textContentInput = document.getElementById('note-text-content') as HTMLTextAreaElement;
   const fontColorInput = document.getElementById('note-font-color') as HTMLInputElement;
   const fontSizeInput = document.getElementById('note-font-size') as HTMLInputElement;
   const fontSizeLabel = document.getElementById('note-font-size-label') as HTMLSpanElement;
@@ -1994,7 +2000,6 @@ function openCardEditor(card: BoardCard): void {
     }
     for (const item of textItems) {
       const div = document.createElement('div');
-      div.contentEditable = 'false';
       div.className = 'note-canvas-item note-text';
       div.textContent = item.text;
       const legacyY = item.id === 'legacy-text' ? Math.max(item.y, 90) : item.y;
@@ -2007,34 +2012,6 @@ function openCardEditor(card: BoardCard): void {
       div.style.transform = `rotate(${item.rotation || 0}deg)`;
       div.dataset.id = item.id;
       div.dataset.type = 'text';
-      div.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        div.contentEditable = 'true';
-        div.focus();
-        // Move cursor to end
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(div);
-        range.collapse(false);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      });
-      div.addEventListener('blur', () => {
-        div.contentEditable = 'false';
-        item.text = div.textContent || '';
-        queueLiveCardUpdate();
-      });
-      div.addEventListener('input', () => {
-        item.text = div.textContent || '';
-        queueLiveCardUpdate();
-      });
-      div.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          div.blur();
-        }
-      });
       noteCanvas.appendChild(div);
     }
   }
@@ -2053,6 +2030,7 @@ function openCardEditor(card: BoardCard): void {
         }
       }
       fontControls.style.display = 'flex';
+      textContentInput.value = item.text || '';
       fontColorInput.value = item.color || '#2a1a0a';
       fontSizeInput.value = String(item.size || 14);
       fontSizeLabel.textContent = `${item.size || 14}px`;
@@ -2074,6 +2052,7 @@ function openCardEditor(card: BoardCard): void {
     const item = (selected.type === 'text' ? textItems : imageItems).find(i => i.id === selected!.id) as any;
     if (!item) return;
     if (selected.type === 'text') {
+      item.text = textContentInput.value;
       item.color = fontColorInput.value;
       item.size = parseInt(fontSizeInput.value) || 14;
       fontSizeLabel.textContent = `${item.size}px`;
@@ -2110,6 +2089,7 @@ function openCardEditor(card: BoardCard): void {
 
   fontColorInput.addEventListener('input', updateSelected);
   fontSizeInput.addEventListener('input', updateSelected);
+  textContentInput.addEventListener('input', updateSelected);
   
   function getItemSize(item: any, type: 'text' | 'image'): { w: number; h: number } {
     if (type === 'text' && item.w && item.h) {
@@ -2312,24 +2292,9 @@ function openCardEditor(card: BoardCard): void {
 
   document.getElementById('btn-add-text')!.addEventListener('click', () => {
     const id = `txt_${Math.random().toString(36).slice(2, 8)}`;
-    textItems.push({ id, text: 'Click to edit...', x: 20, y: 40, w: 160, h: 70, size: 14, color: '#2a1a0a', rotation: 0 });
+    textItems.push({ id, text: 'New text', x: 20, y: 40, w: 160, h: 70, size: 14, color: '#2a1a0a', rotation: 0 });
     renderCanvas();
     setSelected('text', id);
-    
-    // Auto-focus for editing
-    setTimeout(() => {
-      const textDiv = noteCanvas.querySelector(`[data-id="${id}"]`) as HTMLDivElement;
-      if (textDiv) {
-        textDiv.contentEditable = 'true';
-        textDiv.focus();
-        textDiv.textContent = '';
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(textDiv);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      }
-    }, 0);
   });
 
   function addImageFromUrl(url: string, size = 120): void {
@@ -2514,12 +2479,15 @@ function openCardEditor(card: BoardCard): void {
   
   updateDrawButtons();
 
-  // Close editor when clicking overlay background
+  // Close editor when clicking overlay background or close button
+  const closeBtn = document.getElementById('btn-editor-close');
+  const handleClose = () => {
+    net.sendBoardOp(gameStore.getLobbyId(), { type: 'unlock_card', cardId: card.id });
+    overlay.remove();
+  };
+  closeBtn?.addEventListener('click', handleClose);
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) {
-      net.sendBoardOp(gameStore.getLobbyId(), { type: 'unlock_card', cardId: card.id });
-      overlay.remove();
-    }
+    if (e.target === overlay) handleClose();
   });
 
   // Add live update listener for tag changes
@@ -2537,7 +2505,10 @@ function openTapeEditor(tape: BoardTape): void {
   
   overlay.innerHTML = `
     <div class="card-editor">
-      <h3>Edit Tape</h3>
+      <div class="card-editor-header">
+        <h3>Edit Tape</h3>
+        <button class="btn-editor-close" id="btn-editor-close" title="Close editor (all changes save automatically)">✕</button>
+      </div>
       <div class="note-canvas-toolbar">
         <div class="note-canvas-actions">
           <button class="btn btn-xs" id="btn-add-tape-text">Add Text</button>
@@ -2567,6 +2538,8 @@ function openTapeEditor(tape: BoardTape): void {
               <span id="tape-selected-label" class="muted">None</span>
             </div>
             <div class="form-row" id="tape-text-controls" style="display:none;">
+              <label>Text Content</label>
+              <textarea id="tape-text-content" class="input" rows="3" placeholder="Type text here..."></textarea>
               <label>Text Color</label>
               <input type="color" id="tape-font-color" value="#2a1a0a" />
               <label>Text Size</label>
@@ -2609,6 +2582,7 @@ function openTapeEditor(tape: BoardTape): void {
   let selected: { type: 'text'; id: string } | null = null;
 
   const fontControls = document.getElementById('tape-text-controls') as HTMLDivElement;
+  const textContentInput = document.getElementById('tape-text-content') as HTMLTextAreaElement;
   const fontColorInput = document.getElementById('tape-font-color') as HTMLInputElement;
   const fontSizeInput = document.getElementById('tape-font-size') as HTMLInputElement;
   const fontSizeLabel = document.getElementById('tape-font-size-label') as HTMLSpanElement;
@@ -2620,7 +2594,6 @@ function openTapeEditor(tape: BoardTape): void {
     
     for (const item of textItems) {
       const div = document.createElement('div');
-      div.contentEditable = 'false';
       div.className = 'note-canvas-item note-text';
       div.textContent = item.text;
       div.style.position = 'absolute';
@@ -2633,33 +2606,6 @@ function openTapeEditor(tape: BoardTape): void {
       div.style.transform = `rotate(${ item.rotation || 0}deg)`;
       div.dataset.id = item.id;
       div.dataset.type = 'text';
-      div.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        div.contentEditable = 'true';
-        div.focus();
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(div);
-        range.collapse(false);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      });
-      div.addEventListener('blur', () => {
-        div.contentEditable = 'false';
-        item.text = div.textContent || '';
-        queueLiveTapeUpdate();
-      });
-      div.addEventListener('input', () => {
-        item.text = div.textContent || '';
-        queueLiveTapeUpdate();
-      });
-      div.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          div.blur();
-        }
-      });
       tapeCanvas.appendChild(div);
     }
   }
@@ -2675,6 +2621,7 @@ function openTapeEditor(tape: BoardTape): void {
       item.h = el.offsetHeight;
     }
     fontControls.style.display = 'flex';
+    textContentInput.value = item.text || '';
     fontColorInput.value = item.color || '#2a1a0a';
     fontSizeInput.value = String(item.size || 12);
     fontSizeLabel.textContent = `${item.size || 12}px`;
@@ -2692,6 +2639,7 @@ function openTapeEditor(tape: BoardTape): void {
     if (!selected) return;
     const item = textItems.find(i => i.id === selected!.id);
     if (!item) return;
+    item.text = textContentInput.value;
     item.color = fontColorInput.value;
     item.size = parseInt(fontSizeInput.value) || 12;
     fontSizeLabel.textContent = `${item.size}px`;
@@ -2904,24 +2852,9 @@ function openTapeEditor(tape: BoardTape): void {
 
   document.getElementById('btn-add-tape-text')!.addEventListener('click', () => {
     const id = `text_${Math.random().toString(36).slice(2, 8)}`;
-    textItems.push({ id, text: 'Click to edit...', x: 20, y: 30, w: 60, h: 20, size: 12, color: '#2a1a0a', rotation: 0 });
+    textItems.push({ id, text: 'New text', x: 20, y: 30, w: 60, h: 20, size: 12, color: '#2a1a0a', rotation: 0 });
     renderCanvas();
     setSelected(id);
-    
-    // Auto-focus for editing
-    setTimeout(() => {
-      const textDiv = tapeCanvas.querySelector(`[data-id="${id}"]`) as HTMLDivElement;
-      if (textDiv) {
-        textDiv.contentEditable = 'true';
-        textDiv.focus();
-        textDiv.textContent = '';
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(textDiv);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      }
-    }, 0);
   });
 
   renderCanvas();
@@ -3056,11 +2989,19 @@ function openTapeEditor(tape: BoardTape): void {
 
   updateDrawButtons();
 
+  // Event listeners for text editing
+  textContentInput.addEventListener('input', updateSelected);
+  fontColorInput.addEventListener('input', updateSelected);
+  fontSizeInput.addEventListener('input', updateSelected);
+
   // Close editor when clicking overlay background
+  const closeBtn = document.getElementById('btn-editor-close');
+  const handleClose = () => {
+    overlay.remove();
+  };
+  closeBtn?.addEventListener('click', handleClose);
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) {
-      overlay.remove();
-    }
+    if (e.target === overlay) handleClose();
   });
 }
 

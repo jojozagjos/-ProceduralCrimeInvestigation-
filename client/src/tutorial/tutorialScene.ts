@@ -17,7 +17,7 @@ const TUTORIAL_STEPS = [
   },
   {
     title: '📝 Creating Notes',
-    text: 'Click the 📝 Note button to create a blank sticky note. Double-click any card to edit it — you can change the title, add text, choose a color, and even draw on it with the built-in drawing tools.',
+    text: 'Click the 📝 Note button to create a blank sticky note. Click any card to select it, then use the editor panel on the right to change the title, add text, choose a color, and draw. All changes sync in real-time!',
   },
   {
     title: '📏 Using Tape',

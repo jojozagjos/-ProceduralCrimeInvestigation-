@@ -50,7 +50,7 @@ function showHowToPlay(container: HTMLElement): void {
           <li><strong>Zoom:</strong> Mouse wheel on board</li>
           <li><strong>Pin evidence:</strong> Open Evidence panel → Pin to Board</li>
           <li><strong>Create note:</strong> Click 📝 Note on the board toolbar</li>
-          <li><strong>Edit card:</strong> Double-click a card on the board</li>
+          <li><strong>Edit card:</strong> Click a card on board, then use editor panel on right</li>
           <li><strong>Draw:</strong> In card editor, use the drawing canvas</li>
           <li><strong>Connect cards:</strong> Click 🔗 Connect, then click two cards</li>
           <li><strong>Interview:</strong> Open Suspects panel → Request Interview</li>

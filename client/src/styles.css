@@ -2347,10 +2347,44 @@ textarea.input {
   overflow-y: auto;
 }
 
+.card-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.2rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 2px solid var(--border);
+}
+
 .card-editor h3 {
   font-family: var(--font-heading);
   color: var(--accent);
-  margin-bottom: 0.8rem;
+  margin: 0;
+}
+
+.btn-editor-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-editor-close:hover {
+  background: rgba(255, 193, 7, 0.1);
+  color: var(--accent);
+}
+
+.btn-editor-close:active {
+  transform: scale(0.95);
 }
 
 .card-editor .input {
