@@ -2052,6 +2052,7 @@ textarea.input {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  max-height: 600px;
 }
 
 .interview-log-header {

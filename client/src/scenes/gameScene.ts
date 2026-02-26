@@ -373,7 +373,15 @@ function updateInterviewVote(votes: Record<string, boolean>, needed: number): vo
 }
 
 function updateInterviewLeaveVote(votes: Record<string, boolean>, needed: number): void {
-  const count = Object.values(votes).filter(v => v).length;
+  const voteValues = Object.values(votes);
+  const count = voteValues.filter(v => v).length;
+  
+  // If votes are empty (reset after someone voted no), remove the modal
+  if (voteValues.length === 0) {
+    const existingOverlay = document.getElementById('interview-leave-vote-overlay');
+    if (existingOverlay) existingOverlay.remove();
+    return;
+  }
   
   // Show the modal if it doesn't exist yet
   if (!document.getElementById('interview-leave-vote-overlay')) {
@@ -447,7 +455,9 @@ function showInterviewLeaveVote(): void {
     noBtn.disabled = false;
     noBtn.addEventListener('click', () => {
       net.voteInterviewLeave(gameStore.getLobbyId(), false);
-      voteOverlay.remove();
+      // Don't remove locally - wait for server to send update with reset votes
+      yesBtn.disabled = true;
+      noBtn.disabled = true;
     });
   }
 }
