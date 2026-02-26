@@ -790,8 +790,7 @@ export function renderCorkboard(container: HTMLElement): void {
           physics.rotation += physics.angularVelocity;
           sprite.rotation = physics.rotation;
           
-          // Fade out
-          sprite.alpha = Math.max(0, 1 - elapsed / 3000);
+          // Don't fade - keep at full opacity until removal
           
           // Update pin physics if it exists
           if (physics.pinPhysics) {
@@ -879,7 +878,7 @@ export function renderCorkboard(container: HTMLElement): void {
           physics.rotation += physics.vr;
           sprite.rotation = (physics.rotation * Math.PI) / 180;
           
-          sprite.alpha = Math.max(0, 1 - elapsed / 3000);
+          // Don't fade - keep at full opacity until removal
         } else {
           tapeContainer.removeChild(sprite);
           tapeSprites.delete(tapeId);
@@ -936,11 +935,16 @@ export function renderCorkboard(container: HTMLElement): void {
       }
       updateRope(rope);
 
-      // Draw rope with fading when breaking
+      // Draw rope with fading only at the very end
       let ropeAlpha = 0.9;
       if (rope.breaking && rope.breakStart) {
         const elapsed = performance.now() - rope.breakStart;
-        ropeAlpha = Math.max(0, 0.9 - elapsed / 4000); // Fade out over 4 seconds
+        // Only fade in the last 300ms before despawn
+        const despawnDelay = rope.despawnDelay ?? 7000;
+        const fadeStart = Math.max(3700, (despawnDelay || 7000) - 300);
+        if (elapsed > fadeStart) {
+          ropeAlpha = Math.max(0, 0.9 * (1 - (elapsed - fadeStart) / 300));
+        }
       }
       
       // Scale rope width based on zoom level for better visibility when zoomed out
@@ -1066,9 +1070,9 @@ function buildTapeTextSprite(tape: BoardTape, item: NoteTextItem): PIXI.Text {
   const text = new PIXI.Text(item.text.slice(0, 50), style);
   text.resolution = Math.min(8, Math.max(2, window.devicePixelRatio || 1));
   text.name = `tape-text:${item.id}`;
-  text.anchor.set(0.5, 0.5);
-  text.x = item.x * scaleX - TAPE_W / 2;
-  text.y = item.y * scaleY - TAPE_H / 2;
+  text.anchor.set(0, 0);
+  text.x = (item.x - TAPE_CANVAS_W / 2) * scaleX;
+  text.y = (item.y - TAPE_CANVAS_H / 2) * scaleY;
   text.scale.set(scaleX, scaleY);
   text.rotation = ((item.rotation || 0) * Math.PI) / 180;
   return text;
@@ -1762,10 +1766,10 @@ function buildNoteTextSprite(card: BoardCard, item: NoteTextItem): PIXI.Text {
     text.x = item.x * scaleX;
     text.y = legacyY * scaleY;
   } else {
-    // For user-added text, use center anchor with stored top-left position
-    text.anchor.set(0.5);
-    text.x = item.x * scaleX + ((item.w || CARD_W - 10) * scaleX) / 2;
-    text.y = item.y * scaleY + ((item.h || 20) * scaleY) / 2;
+    // For user-added text, use top-left anchor to match editor positioning
+    text.anchor.set(0, 0);
+    text.x = item.x * scaleX;
+    text.y = item.y * scaleY;
   }
   text.rotation = ((item.rotation || 0) * Math.PI) / 180;
   return text;
