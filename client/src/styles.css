@@ -3316,59 +3316,78 @@ textarea.input {
 /* ─── ACCUSATION RESULTS ──────────────────────────────────────────────────── */
 
 .results-reveal {
-  background: rgba(0, 0, 0, 0.98);
+  background: rgba(0, 0, 0, 0.99);
 }
 
 .accusation-results {
   max-width: 700px;
+  animation: slideIn 0.6s ease-out;
 }
 
 .result-header {
   text-align: center;
-  padding: 2rem;
-  border-radius: 8px;
-  margin-bottom: 2rem;
+  padding: 2.5rem 2rem;
+  border-radius: 12px;
+  margin-bottom: 2.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.result-header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.1), transparent 70%);
+  pointer-events: none;
 }
 
 .result-header.result-success {
-  background: linear-gradient(135deg, rgba(76, 175, 80, 0.3), rgba(46, 125, 50, 0.3));
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.25), rgba(46, 125, 50, 0.25));
   border: 2px solid #4CAF50;
+  box-shadow: 0 0 30px rgba(76, 175, 80, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .result-header.result-fail {
-  background: linear-gradient(135deg, rgba(244, 67, 54, 0.3), rgba(198, 40, 40, 0.3));
+  background: linear-gradient(135deg, rgba(244, 67, 54, 0.25), rgba(198, 40, 40, 0.25));
   border: 2px solid #F44336;
+  box-shadow: 0 0 30px rgba(244, 67, 54, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .result-icon {
-  font-size: 4rem;
-  margin-bottom: 0.5rem;
-  animation: bounceIn 0.6s ease-out;
+  font-size: 5rem;
+  margin-bottom: 0.75rem;
+  animation: bounceIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: inline-block;
 }
 
 @keyframes bounceIn {
   0% {
-    transform: scale(0);
+    transform: scale(0) rotateZ(-10deg);
     opacity: 0;
   }
   50% {
-    transform: scale(1.2);
+    transform: scale(1.15) rotateZ(5deg);
   }
   100% {
-    transform: scale(1);
+    transform: scale(1) rotateZ(0);
     opacity: 1;
   }
 }
 
 .result-header h2 {
   margin: 0 0 0.5rem 0;
-  font-size: 2.2rem;
+  font-size: 2.5rem;
+  font-family: var(--font-heading);
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: var(--text);
 }
 
 .result-verdict {
   margin: 0;
-  font-size: 1.1rem;
-  color: var(--text-secondary);
+  font-size: 1.05rem;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .result-details {
@@ -3379,20 +3398,22 @@ textarea.input {
 }
 
 .result-section {
-  background: var(--bg-mid);
-  padding: 1.25rem;
-  border-radius: 8px;
+  background: rgba(20, 28, 38, 0.85);
+  padding: 1.5rem;
+  border-radius: 10px;
   border: 1px solid var(--border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .result-section h3 {
-  margin: 0 0 1rem 0;
-  font-size: 1.1rem;
+  margin: 0 0 1.25rem 0;
+  font-size: 1.15rem;
   color: var(--accent);
   text-transform: uppercase;
-  letter-spacing: 1px;
-  border-bottom: 2px solid var(--border);
-  padding-bottom: 0.5rem;
+  letter-spacing: 1.5px;
+  border-bottom: 2px solid rgba(255, 193, 7, 0.4);
+  padding-bottom: 0.75rem;
+  font-weight: 700;
 }
 
 .result-culprit {
@@ -3500,11 +3521,21 @@ textarea.input {
 }
 
 .score-display {
-  font-size: 3rem;
-  font-weight: 700;
+  font-size: 3.5rem;
+  font-weight: 900;
   color: var(--accent);
-  text-shadow: 0 2px 8px rgba(255, 193, 7, 0.5);
-  margin-top: 0.5rem;
+  text-shadow: 0 0 20px rgba(255, 193, 7, 0.5), 0 2px 8px rgba(0, 0, 0, 0.8);
+  margin-top: 1rem;
+  animation: scoreGlow 2s ease-in-out infinite;
+}
+
+@keyframes scoreGlow {
+  0%, 100% {
+    text-shadow: 0 0 20px rgba(255, 193, 7, 0.5), 0 2px 8px rgba(0, 0, 0, 0.8);
+  }
+  50% {
+    text-shadow: 0 0 40px rgba(255, 193, 7, 0.8), 0 2px 8px rgba(0, 0, 0, 0.8);
+  }
 }
 
 .result-actions {

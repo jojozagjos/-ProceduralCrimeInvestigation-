@@ -11,6 +11,7 @@ let currentTab: 'public' | 'create' | 'join' | 'daily' = 'public';
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 export function renderPlayScene(container: HTMLElement): () => void {
+  currentTab = 'public';
   container.innerHTML = `
     <div class="play-screen">
       <div class="play-header">

@@ -241,7 +241,7 @@ function handleGameMessage(msg: ServerMessage): void {
     case 'accusation:opened':
       (globalThis as any).accusationInitiatorId = msg.data.initiatorId;
       (globalThis as any).accusationFinalVote = undefined; // Reset vote status
-      gameStore.setState({ ...gameStore.getState()!, accusationDraft: msg.data.draft, accusationFinalVotes: {} });
+      gameStore.setState({ ...gameStore.getState()!, accusationDraft: { ...msg.data.draft, initiatorId: msg.data.initiatorId }, accusationFinalVotes: {} });
       showCollaborativeAccusation(msg.data.initiatorId, msg.data.draft);
       break;
 
@@ -814,9 +814,10 @@ function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: st
   const state = gameStore.getState();
   if (!state) return;
 
-  const initiatorName = state.players?.find(p => p.id === initiatorId)?.displayName || 'A player';
+  const { lobby } = getLobbyData();
+  const initiatorName = lobby?.players?.find((p: Player) => p.id === initiatorId)?.displayName || 'A player';
   const finalVotes = state.accusationFinalVotes || {};
-  const totalPlayers = state.players?.length || 1;
+  const totalPlayers = lobby?.players?.length || 1;
 
   // Count votes
   const submitVotes = Object.values(finalVotes).filter(v => v === 'submit').length;
@@ -942,7 +943,8 @@ function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: st
         .filter((cb: Element) => (cb as HTMLInputElement).checked)
         .map((cb: Element) => (cb as HTMLInputElement).value),
     };
-    gameStore.setState({ ...gameStore.getState()!, accusationDraft: newDraft });
+    const currentDraft = gameStore.getState()?.accusationDraft;
+    gameStore.setState({ ...gameStore.getState()!, accusationDraft: { ...newDraft, initiatorId: currentDraft?.initiatorId || (globalThis as any).accusationInitiatorId } });
     updateAccusationDraft(newDraft);
     net.updateAccusationDraft(gameStore.getLobbyId(), newDraft);
   };
@@ -1022,7 +1024,8 @@ function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: st
 }
 
 function updateAccusationDraft(draft: { suspectId: string; motive: string; method: string; evidenceIds: string[] }): void {
-  gameStore.setState({ ...gameStore.getState()!, accusationDraft: draft });
+  const currentDraft = gameStore.getState()?.accusationDraft;
+  gameStore.setState({ ...gameStore.getState()!, accusationDraft: { ...draft, initiatorId: currentDraft?.initiatorId || (globalThis as any).accusationInitiatorId } });
 
   // Update the form elements in real-time as other players edit
   const suspectSelect = document.getElementById('acc-suspect') as HTMLSelectElement;
