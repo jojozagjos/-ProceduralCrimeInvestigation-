@@ -36,5 +36,16 @@ net.onMessage((msg: ServerMessage) => {
   }
 });
 
+// Graceful disconnect when closing tab/window
+window.addEventListener('beforeunload', () => {
+  const lobbyId = gameStore.getLobbyId();
+  if (lobbyId && net.isConnected()) {
+    // Try to leave lobby explicitly before closing
+    net.leaveLobby(lobbyId);
+    // Disconnect the WebSocket
+    net.disconnect();
+  }
+});
+
 // Start at splash screen
 navigateTo('splash', false);
