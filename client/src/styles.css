@@ -1442,9 +1442,10 @@ textarea.input {
 }
 
 .suspect-card {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   gap: 0.6rem;
+  align-items: start;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1466,7 +1467,7 @@ textarea.input {
 
 .suspect-name {
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.7rem;
 }
 
 .suspect-occ, .suspect-rel {

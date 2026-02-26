@@ -144,6 +144,7 @@ function handleDisconnect(client: ClientSocket): void {
       } else {
         lobbyMgr.disconnectPlayer(lobbyId, client.playerId);
         systemMessage(lobbyId, `${client.displayName} disconnected.`);
+        broadcastLobbyUpdate(lobbyId);
       }
     }
   }

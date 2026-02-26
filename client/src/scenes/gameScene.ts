@@ -1149,7 +1149,7 @@ function showAccusationResults(data: { correct: boolean; score: number; culpritI
   document.getElementById('btn-return-lobby')!.addEventListener('click', () => {
     overlay.innerHTML = '';
     gameStore.clear();
-    playMusic('music_investigation');
+    playMusic('music_menu');
     navigateTo('play');
   });
 }
