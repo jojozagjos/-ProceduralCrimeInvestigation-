@@ -2288,6 +2288,7 @@ function openCardEditor(card: BoardCard): void {
     selectedLabel.textContent = 'None';
     selectionBox.style.display = 'none';
     renderCanvas();
+    queueLiveCardUpdate();
   });
 
   document.getElementById('btn-add-text')!.addEventListener('click', () => {
@@ -2295,6 +2296,7 @@ function openCardEditor(card: BoardCard): void {
     textItems.push({ id, text: 'New text', x: 20, y: 40, w: 160, h: 70, size: 14, color: '#2a1a0a', rotation: 0 });
     renderCanvas();
     setSelected('text', id);
+    queueLiveCardUpdate();
   });
 
   function addImageFromUrl(url: string, size = 120): void {
@@ -2304,6 +2306,7 @@ function openCardEditor(card: BoardCard): void {
       imageItems.push({ id, url, x: 40, y: 80, w: size, h: size, rotation: 0 });
       renderCanvas();
       setSelected('image', id);
+      queueLiveCardUpdate();
     };
     img.onerror = () => {
       showToast('Invalid image URL.');
