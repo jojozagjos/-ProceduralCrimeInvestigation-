@@ -733,17 +733,6 @@ export function renderCorkboard(container: HTMLElement): void {
     const unsub = gameStore.subscribe(() => syncBoard());
     syncBoard();
 
-    // Listen for delete_card_animated events from other players
-    window.addEventListener('delete_card_animated', (e: Event) => {
-      const customEvent = e as CustomEvent<{ cardId: string }>;
-      const cardId = customEvent.detail.cardId;
-      // Only trigger animation if we didn't initiate it (check if sprite is not already deleting)
-      const sprite = cardSprites.get(cardId);
-      if (sprite && !(sprite as any)._isDeleting) {
-        startCardDeletion(cardId);
-      }
-    });
-
     let currentTextResolution = Math.min(8, Math.max(2, window.devicePixelRatio || 1));
 
     // Animation loop for ropes
@@ -947,9 +936,18 @@ export function renderCorkboard(container: HTMLElement): void {
       }
       updateRope(rope);
 
-      // Draw rope
-      const ropeAlpha = 0.9;
-      ropeGraphics.lineStyle(2.5, 0xCC2222, ropeAlpha);
+      // Draw rope with fading when breaking
+      let ropeAlpha = 0.9;
+      if (rope.breaking && rope.breakStart) {
+        const elapsed = performance.now() - rope.breakStart;
+        ropeAlpha = Math.max(0, 0.9 - elapsed / 4000); // Fade out over 4 seconds
+      }
+      
+      // Scale rope width based on zoom level for better visibility when zoomed out
+      const currentScale = boardContainer.scale.x;
+      const ropeWidth = Math.max(2.5, 2.5 / currentScale);
+      
+      ropeGraphics.lineStyle(ropeWidth, 0xCC2222, ropeAlpha);
       ropeGraphics.moveTo(rope.points[0].x, rope.points[0].y);
       for (let i = 1; i < rope.points.length; i++) {
         if (rope.breakIndex !== undefined && i === rope.breakIndex + 1) {
@@ -964,13 +962,17 @@ export function renderCorkboard(container: HTMLElement): void {
       const connection = state?.board.connections.find(c => c.id === rope.connectionId);
       if (connection?.label && !rope.breaking) {
         const mid = Math.floor(rope.points.length / 2);
+        // Scale font size for better visibility when zoomed out
+        const currentScale = boardContainer.scale.x;
+        const labelFontSize = Math.max(9, 9 / currentScale);
+        
         const labelStyle = new PIXI.TextStyle({
           fontFamily: 'Georgia, serif',
-          fontSize: 9,
+          fontSize: labelFontSize,
           fill: '#2a1a0a',
           fontWeight: 'bold',
           stroke: '#fffacd',
-          strokeThickness: 3,
+          strokeThickness: Math.max(3, 3 / currentScale),
         });
         const labelText = new PIXI.Text(connection.label.slice(0, 20), labelStyle);
         labelText.resolution = currentTextResolution;
@@ -997,32 +999,40 @@ export function renderCorkboard(container: HTMLElement): void {
         const pinY = pin.y;
         
         // Draw rotated pin (simplified - just circles, rotation visual is subtle)
-        pinOverlay.lineStyle(1.6, 0xE55B5B, 0.95 * alpha);
+        const currentScale = boardContainer.scale.x;
+        const pinLineWidth = Math.max(1.6, 1.6 / currentScale);
+        pinOverlay.lineStyle(pinLineWidth, 0xE55B5B, 0.95 * alpha);
         pinOverlay.moveTo(pinX, pinY + 3);
         pinOverlay.lineTo(pinX, pinY + 10);
         pinOverlay.lineStyle(0);
 
+        const pinRadius = Math.max(5, 5 / currentScale);
+        const pinHighlightRadius = Math.max(2, 2 / currentScale);
         pinOverlay.beginFill(0xCC3333, alpha);
-        pinOverlay.drawCircle(pinX, pinY, 5);
+        pinOverlay.drawCircle(pinX, pinY, pinRadius);
         pinOverlay.endFill();
         pinOverlay.beginFill(0xFFAAAA, alpha);
-        pinOverlay.drawCircle(pinX - 1, pinY - 1, 2);
+        pinOverlay.drawCircle(pinX - 1, pinY - 1, pinHighlightRadius);
         pinOverlay.endFill();
         continue;
       }
       
       const pinX = card.x;
       const pinY = card.y;
-      pinOverlay.lineStyle(1.6, 0xE55B5B, 0.95);
+      const currentScale = boardContainer.scale.x;
+      const pinLineWidth = Math.max(1.6, 1.6 / currentScale);
+      pinOverlay.lineStyle(pinLineWidth, 0xE55B5B, 0.95);
       pinOverlay.moveTo(pinX, pinY + 3);
       pinOverlay.lineTo(pinX, pinY + 10);
       pinOverlay.lineStyle(0);
 
+      const pinRadius = Math.max(5, 5 / currentScale);
+      const pinHighlightRadius = Math.max(2, 2 / currentScale);
       pinOverlay.beginFill(0xCC3333);
-      pinOverlay.drawCircle(pinX, pinY, 5);
+      pinOverlay.drawCircle(pinX, pinY, pinRadius);
       pinOverlay.endFill();
       pinOverlay.beginFill(0xFFAAAA);
-      pinOverlay.drawCircle(pinX - 1, pinY - 1, 2);
+      pinOverlay.drawCircle(pinX - 1, pinY - 1, pinHighlightRadius);
       pinOverlay.endFill();
     }
   });
@@ -1177,7 +1187,7 @@ function createTapeSprite(tape: BoardTape): void {
   });
 }
 
-function startTapeDeletion(tapeId: string): void {
+function startTapeDeletion(tapeId: string, sendUpdate: boolean = true): void {
   const physics = tapePhysics.get(tapeId);
   const sprite = tapeSprites.get(tapeId);
   if (!physics || !sprite) return;
@@ -1188,10 +1198,10 @@ function startTapeDeletion(tapeId: string): void {
   physics.oldY = physics.y;
   physics.vr = (Math.random() - 0.5) * 0.03;
   
-  // Send delete operation after animation
-  setTimeout(() => {
+  // Only send server update if this is the initiating client
+  if (sendUpdate) {
     sendBoardOpWithHistory({ type: 'remove_tape', tapeId });
-  }, 4200);
+  }
   
   playSfx('sfx_ui_click');
 }
@@ -1233,16 +1243,15 @@ function syncBoard(): void {
     }
     existingIds.delete(card.id);
   }
-  // Remove deleted cards
+  // Remove deleted cards - trigger animation for newly deleted cards
   for (const id of existingIds) {
     const sprite = cardSprites.get(id);
     const physics = cardPhysics.get(id);
     // Don't remove if currently animating deletion (either physics flag or sprite-level flag)
     const spriteDeleting = !!(sprite && (sprite as any)._isDeleting);
     if (sprite && !(physics?.isDeleting || spriteDeleting)) {
-      boardContainer.removeChild(sprite);
-      cardSprites.delete(id);
-      cardPhysics.delete(id);
+      // Card was removed from state - trigger delete animation
+      startCardDeletion(id, false); // false = don't send server update (already removed from state)
     }
   }
 
@@ -1332,20 +1341,19 @@ function syncBoard(): void {
     }
     existingTapes.delete(tape.id);
   }
-  // Remove deleted tapes
+  // Remove deleted tapes - trigger animation for newly deleted tapes
   for (const id of existingTapes) {
     const sprite = tapeSprites.get(id);
     const physics = tapePhysics.get(id);
     // Don't remove if currently animating deletion
     if (sprite && !physics?.isDeleting) {
-      tapeContainer.removeChild(sprite);
-      tapeSprites.delete(id);
-      tapePhysics.delete(id);
+      // Tape was removed from state - trigger delete animation
+      startTapeDeletion(id, false); // false = don't send server update (already removed from state)
     }
   }
 }
 
-function startCardDeletion(cardId: string): void {
+function startCardDeletion(cardId: string, sendUpdate: boolean = true): void {
   let physics = cardPhysics.get(cardId);
   const sprite = cardSprites.get(cardId);
   if (!sprite) return;
@@ -1420,13 +1428,10 @@ function startCardDeletion(cardId: string): void {
     vr: (Math.random() - 0.5) * 0.05
   };
   
-  // Send delete_card_animated immediately so other players see the animation
-  sendBoardOpWithHistory({ type: 'delete_card_animated', cardId });
-  
-  // Send the actual remove_card op after animation completes
-  setTimeout(() => {
+  // Only send server update if this is the initiating client
+  if (sendUpdate) {
     sendBoardOpWithHistory({ type: 'remove_card', cardId });
-  }, 4200);
+  }
   
   playSfx('sfx_ui_click');
 }

@@ -235,7 +235,6 @@ export type BoardOp =
   | { type: 'move_card'; cardId: string; x: number; y: number }
   | { type: 'update_card'; cardId: string; content: string; title?: string; tag?: EvidenceTag; imageUrl?: string; noteColor?: string; textItems?: NoteTextItem[]; imageItems?: NoteImageItem[] }
   | { type: 'remove_card'; cardId: string }
-  | { type: 'delete_card_animated'; cardId: string } // Triggers falling animation before removal
   | { type: 'add_connection'; connection: BoardConnection }
   | { type: 'remove_connection'; connectionId: string }
   | { type: 'add_tape'; tape: BoardTape }
