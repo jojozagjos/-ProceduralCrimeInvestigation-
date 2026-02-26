@@ -1927,6 +1927,57 @@ function openCardEditor(card: BoardCard): void {
   const deleteBtn = document.getElementById('btn-delete-item') as HTMLButtonElement;
 
   let liveUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+  
+  // Listen for incoming updates to this card from other players
+  const storeUnsub = gameStore.subscribe(() => {
+    const state = gameStore.getState();
+    if (!state || !overlay.parentElement) {
+      // Editor closed
+      if (storeUnsub) storeUnsub();
+      return;
+    }
+    
+    const updatedCard = state.board.cards.find(c => c.id === card.id);
+    if (updatedCard) {
+      // Check if another player modified the card (by comparing with current values)
+      const currentTitle = (document.getElementById('card-title-edit') as HTMLInputElement | null)?.value;
+      const currentColor = (document.getElementById('card-color-edit') as HTMLInputElement | null)?.value;
+      
+      // If title/color changed from external source, update local state
+      if (currentTitle !== updatedCard.title || currentColor !== updatedCard.noteColor) {
+        if (currentTitle !== updatedCard.title) {
+          (document.getElementById('card-title-edit') as HTMLInputElement).value = updatedCard.title;
+        }
+        if (currentColor !== updatedCard.noteColor) {
+          const newColor = updatedCard.noteColor || '#fffacd';
+          (document.getElementById('card-color-edit') as HTMLInputElement).value = newColor;
+          noteCanvas.style.background = newColor;
+        }
+        renderCanvas();
+      }
+      
+      // Update text and image items if they changed
+      const hasTextChanges = JSON.stringify(updatedCard.textItems) !== JSON.stringify(textItems);
+      const hasImageChanges = JSON.stringify(updatedCard.imageItems) !== JSON.stringify(imageItems);
+      
+      if (hasTextChanges || hasImageChanges) {
+        // Update local arrays without losing current selection
+        if (updatedCard.textItems) {
+          textItems.length = 0;
+          textItems.push(...updatedCard.textItems.map(i => ({ ...i })));
+        }
+        if (updatedCard.imageItems) {
+          imageItems.length = 0;
+          imageItems.push(...updatedCard.imageItems.map(i => ({ ...i })));
+        }
+        renderCanvas();
+        // Keep selection if the item still exists
+        if (selected && !textItems.concat(imageItems as any).find(i => i.id === selected!.id)) {
+          clearSelection();
+        }
+      }
+    }
+  });
 
   function buildCardUpdateOp(): BoardOp {
     const title = (document.getElementById('card-title-edit') as HTMLInputElement).value;
@@ -2486,6 +2537,7 @@ function openCardEditor(card: BoardCard): void {
   const closeBtn = document.getElementById('btn-editor-close');
   const handleClose = () => {
     net.sendBoardOp(gameStore.getLobbyId(), { type: 'unlock_card', cardId: card.id });
+    if (storeUnsub) storeUnsub();
     overlay.remove();
   };
   closeBtn?.addEventListener('click', handleClose);
@@ -2559,6 +2611,35 @@ function openTapeEditor(tape: BoardTape): void {
   const textItems: NoteTextItem[] = tape.textItems ? tape.textItems.map(i => ({ ...i })) : [];
 
   let liveTapeUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+  
+  // Listen for incoming updates to this tape from other players
+  const storeUnsub = gameStore.subscribe(() => {
+    const state = gameStore.getState();
+    if (!state || !overlay.parentElement) {
+      // Editor closed
+      if (storeUnsub) storeUnsub();
+      return;
+    }
+    
+    const updatedTape = state.board.tapes?.find(t => t.id === tape.id);
+    if (updatedTape) {
+      // Update text items if they changed
+      const hasTextChanges = JSON.stringify(updatedTape.textItems) !== JSON.stringify(textItems);
+      
+      if (hasTextChanges) {
+        // Update local array without losing current selection
+        if (updatedTape.textItems) {
+          textItems.length = 0;
+          textItems.push(...updatedTape.textItems.map(i => ({ ...i })));
+        }
+        renderCanvas();
+        // Keep selection if the item still exists
+        if (selected && !textItems.find(i => i.id === selected!.id)) {
+          clearSelection();
+        }
+      }
+    }
+  });
 
   function buildTapeUpdateOp(): BoardOp {
     return {
@@ -3002,6 +3083,7 @@ function openTapeEditor(tape: BoardTape): void {
   // Close editor when clicking overlay background
   const closeBtn = document.getElementById('btn-editor-close');
   const handleClose = () => {
+    if (storeUnsub) storeUnsub();
     overlay.remove();
   };
   closeBtn?.addEventListener('click', handleClose);
