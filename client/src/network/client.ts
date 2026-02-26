@@ -196,6 +196,18 @@ export function submitAccusation(lobbyId: string, suspectId: string, motive: str
   sendRaw({ type: 'accusation:submit', data: { lobbyId, accusation: { suspectId, motive, method, evidenceIds } } });
 }
 
+export function initiateAccusation(lobbyId: string): void {
+  sendRaw({ type: 'accusation:open', data: { lobbyId } });
+}
+
+export function updateAccusationDraft(lobbyId: string, draft: { suspectId: string; motive: string; method: string; evidenceIds: string[] }): void {
+  sendRaw({ type: 'accusation:update_draft', data: { lobbyId, draft } });
+}
+
+export function voteOnAccusation(lobbyId: string, vote: 'submit' | 'cancel'): void {
+  sendRaw({ type: 'accusation:vote_final', data: { lobbyId, vote } });
+}
+
 export function cancelAccusationVote(lobbyId: string): void {
   sendRaw({ type: 'accusation:cancel', data: { lobbyId } });
 }

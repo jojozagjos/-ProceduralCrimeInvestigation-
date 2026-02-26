@@ -41,6 +41,8 @@ export function createGame(lobby: LobbyInfo): GameState {
     accusations: [],
     accusationVotes: {},
     accusationSubmitted: false,
+    accusationDraft: undefined,
+    accusationFinalVotes: {},
     hintsUsed: 0,
     score: 1000,
     startedAt: Date.now(),
