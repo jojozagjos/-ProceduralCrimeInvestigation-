@@ -18,6 +18,7 @@ let unsub: (() => void) | null = null;
 let storeSub: (() => void) | null = null;
 let chatCleanup: (() => void) | null = null;
 let pauseVisible = false;
+let interviewVoteTimer: ReturnType<typeof setInterval> | null = null;
 
 export function renderGameScene(container: HTMLElement): () => void {
   const state = gameStore.getState();
@@ -317,9 +318,15 @@ function showInterviewVote(suspectId: string, requesterName: string): void {
   const suspect = state.caseData.suspects.find(s => s.id === suspectId);
   if (!suspect) return;
 
+  // Clear any existing timer
+  if (interviewVoteTimer) {
+    clearInterval(interviewVoteTimer);
+    interviewVoteTimer = null;
+  }
+
   const overlay = document.getElementById('overlay-container')!;
   overlay.innerHTML = `
-    <div class="modal-overlay interview-vote-overlay">
+    <div class="modal-overlay interview-vote-overlay" id="interview-vote-overlay">
       <div class="modal">
         <h3>Interview Request</h3>
         <p>${escHtml(requesterName)} wants to interview <strong>${escHtml(suspect.name)}</strong>.</p>
@@ -344,15 +351,25 @@ function showInterviewVote(suspectId: string, requesterName: string): void {
 
   // Timer
   let remaining = 12;
-  const timer = setInterval(() => {
+  let hasAutoVoted = false;
+  interviewVoteTimer = setInterval(() => {
     remaining--;
     const timerEl = document.getElementById('vote-timer');
     if (timerEl) timerEl.textContent = `${remaining}s remaining`;
     if (remaining <= 0) {
-      clearInterval(timer);
-      // Auto-vote no if didn't vote
-      net.voteInterview(gameStore.getLobbyId(), false);
-      disableVoteButtons();
+      if (interviewVoteTimer) clearInterval(interviewVoteTimer);
+      interviewVoteTimer = null;
+      // Auto-vote no if didn't vote (only once)
+      if (!hasAutoVoted) {
+        hasAutoVoted = true;
+        const yesBtn = document.getElementById('vote-yes') as HTMLButtonElement;
+        const noBtn = document.getElementById('vote-no') as HTMLButtonElement;
+        // Only auto-vote if buttons are still enabled (player hasn't voted)
+        if (yesBtn && !yesBtn.disabled) {
+          net.voteInterview(gameStore.getLobbyId(), false);
+          disableVoteButtons();
+        }
+      }
     }
   }, 1000);
 }
@@ -365,9 +382,22 @@ function disableVoteButtons(): void {
 }
 
 function updateInterviewVote(votes: Record<string, boolean>, needed: number): void {
+  const voteValues = Object.values(votes);
+  const count = voteValues.filter(v => v).length;
+  
+  // If votes are empty (reset after someone voted no or timeout), remove the modal and clear timer
+  if (voteValues.length === 0) {
+    const existingOverlay = document.getElementById('interview-vote-overlay');
+    if (existingOverlay) existingOverlay.remove();
+    if (interviewVoteTimer) {
+      clearInterval(interviewVoteTimer);
+      interviewVoteTimer = null;
+    }
+    return;
+  }
+  
   const el = document.getElementById('vote-status');
   if (el) {
-    const count = Object.values(votes).filter(v => v).length;
     el.textContent = `${count}/${needed} votes`;
   }
 }
