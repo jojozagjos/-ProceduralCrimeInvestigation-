@@ -246,6 +246,7 @@ export interface BoardTape {
   color?: string;
   textItems?: NoteTextItem[];
   drawingStrokes?: DrawingStroke[];
+  lockedBy?: string;
 }
 
 export interface BoardState {
@@ -311,6 +312,8 @@ export type BoardOp =
   | { type: 'remove_tape'; tapeId: string }
   | { type: 'lock_card'; cardId: string; playerId: string }
   | { type: 'unlock_card'; cardId: string }
+  | { type: 'lock_tape'; tapeId: string; playerId: string }
+  | { type: 'unlock_tape'; tapeId: string }
   | { type: 'draw_stroke'; cardId: string; stroke: DrawingStroke }
   | { type: 'erase_strokes'; cardId: string }
   | { type: 'draw_tape_stroke'; tapeId: string; stroke: DrawingStroke }

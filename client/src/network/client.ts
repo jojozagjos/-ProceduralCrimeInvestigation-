@@ -116,6 +116,8 @@ function sendRaw(data: any): void {
   }
 }
 
+export { sendRaw };
+
 // ─── API calls ───────────────────────────────────────────────────────────────
 
 export function sendPing(): void {

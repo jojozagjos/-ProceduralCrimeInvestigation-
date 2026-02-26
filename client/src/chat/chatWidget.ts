@@ -6,7 +6,6 @@ import type { ChatMessage, ServerMessage } from '../utils/types.js';
 const messages: ChatMessage[] = [];
 
 export function renderChat(container: HTMLElement, lobbyId: string, collapsible = false): () => void {
-  console.log('[Chat] Rendering chat widget, lobbyId:', lobbyId, 'collapsible:', collapsible);
   container.innerHTML = `
     <div class="chat-widget ${collapsible ? 'collapsible' : ''}">
       ${collapsible ? '<button class="chat-toggle" id="chat-toggle">💬 Chat</button>' : '<h3 class="chat-header">Chat</h3>'}
@@ -21,8 +20,8 @@ export function renderChat(container: HTMLElement, lobbyId: string, collapsible 
   `;
 
   if (collapsible) {
-    const toggle = document.getElementById('chat-toggle');
-    const body = document.getElementById('chat-body');
+    const toggle = container.querySelector('#chat-toggle') as HTMLButtonElement;
+    const body = container.querySelector('#chat-body') as HTMLDivElement;
     if (toggle && body) {
       body.style.display = 'none';
       toggle.addEventListener('click', () => {
@@ -31,13 +30,17 @@ export function renderChat(container: HTMLElement, lobbyId: string, collapsible 
     }
   }
 
-  const input = document.getElementById('chat-input') as HTMLInputElement;
-  const sendBtn = document.getElementById('chat-send')!;
+  const input = container.querySelector('#chat-input') as HTMLInputElement;
+  const sendBtn = container.querySelector('#chat-send') as HTMLButtonElement;
+  
+  if (!input || !sendBtn) {
+    console.error('[Chat] Failed to find input or send button in container');
+    return () => {};
+  }
 
   const send = () => {
     const text = input.value.trim();
     if (!text) return;
-    console.log('[Chat] Sending message:', text, 'to lobby:', lobbyId);
     net.sendChat(lobbyId, text);
     input.value = '';
   };
@@ -47,7 +50,6 @@ export function renderChat(container: HTMLElement, lobbyId: string, collapsible 
 
   const unsub = net.onMessage((msg: ServerMessage) => {
     if (msg.type === 'chat:message') {
-      console.log('[Chat] Received chat message:', msg.data);
       addChatMessage(msg.data);
     }
   });

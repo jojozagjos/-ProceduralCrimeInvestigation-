@@ -114,13 +114,8 @@ export function renderInterviewScene(
 
   // Render chat
   const chatArea = document.getElementById('interview-chat-area');
-  console.log('[Interview] Chat area element:', chatArea);
-  console.log('[Interview] Lobby ID:', gameStore.getLobbyId());
   if (chatArea) {
     chatCleanup = renderChat(chatArea, gameStore.getLobbyId(), false);
-    console.log('[Interview] Chat widget rendered successfully');
-  } else {
-    console.error('[Interview] Chat area element not found!');
   }
 }
 

@@ -161,7 +161,7 @@ function handleGameMessage(msg: ServerMessage): void {
     case 'interview:response': {
       const logEl = document.getElementById('interview-log');
       if (logEl) {
-        // Add question
+        // Add question immediately
         const questionEntry = document.createElement('div');
         questionEntry.className = 'interview-entry asking';
         questionEntry.innerHTML = `
@@ -174,21 +174,40 @@ function handleGameMessage(msg: ServerMessage): void {
           </div>
         `;
         logEl.appendChild(questionEntry);
-        
-        // Add answer
-        const answerEntry = document.createElement('div');
-        answerEntry.className = 'interview-entry response';
-        answerEntry.innerHTML = `
-          <div class="entry-bubble suspect">
-            <div class="bubble-icon">💬</div>
-            <div class="bubble-content">
-              <div class="bubble-label">Suspect Response</div>
-              <div class="a">${escHtml(msg.data.answer)}</div>
-            </div>
-          </div>
-        `;
-        logEl.appendChild(answerEntry);
         logEl.scrollTop = logEl.scrollHeight;
+        
+        // Add answer after delay with typewriter effect
+        setTimeout(() => {
+          const answerEntry = document.createElement('div');
+          answerEntry.className = 'interview-entry response';
+          answerEntry.innerHTML = `
+            <div class="entry-bubble suspect">
+              <div class="bubble-icon">💬</div>
+              <div class="bubble-content">
+                <div class="bubble-label">Suspect Response</div>
+                <div class="a"></div>
+              </div>
+            </div>
+          `;
+          logEl.appendChild(answerEntry);
+          logEl.scrollTop = logEl.scrollHeight;
+          
+          // Typewriter effect
+          const answerText = msg.data.answer;
+          const answerDiv = answerEntry.querySelector('.a') as HTMLDivElement;
+          let charIndex = 0;
+          const typeSpeed = 30; // ms per character
+          
+          const typeInterval = setInterval(() => {
+            if (charIndex < answerText.length) {
+              answerDiv.textContent = answerText.substring(0, charIndex + 1);
+              charIndex++;
+              logEl.scrollTop = logEl.scrollHeight;
+            } else {
+              clearInterval(typeInterval);
+            }
+          }, typeSpeed);
+        }, 1200); // 1.2 second delay before response starts
       }
       break;
     }

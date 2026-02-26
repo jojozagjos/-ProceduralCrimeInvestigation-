@@ -2684,6 +2684,9 @@ function openCardEditor(card: BoardCard): void {
 }
 
 function openTapeEditor(tape: BoardTape): void {
+  // Lock the tape
+  net.sendBoardOp(gameStore.getLobbyId(), { type: 'lock_tape', tapeId: tape.id, playerId: gameStore.getPlayerId() });
+
   const overlay = document.createElement('div');
   overlay.className = 'card-editor-overlay';
   
@@ -3220,6 +3223,7 @@ function openTapeEditor(tape: BoardTape): void {
   // Close editor when clicking overlay background
   const closeBtn = document.getElementById('btn-editor-close');
   const handleClose = () => {
+    net.sendBoardOp(gameStore.getLobbyId(), { type: 'unlock_tape', tapeId: tape.id });
     if (storeUnsub) storeUnsub();
     overlay.remove();
   };

@@ -329,6 +329,16 @@ export function applyBoardOp(lobbyId: string, op: BoardOp): BoardOp | undefined 
       if (card) card.lockedBy = undefined;
       break;
     }
+    case 'lock_tape': {
+      const tape = state.board.tapes?.find(t => t.id === op.tapeId);
+      if (tape) tape.lockedBy = op.playerId;
+      break;
+    }
+    case 'unlock_tape': {
+      const tape = state.board.tapes?.find(t => t.id === op.tapeId);
+      if (tape) tape.lockedBy = undefined;
+      break;
+    }
     case 'draw_stroke': {
       const card = state.board.cards.find(c => c.id === op.cardId);
       if (card) {
