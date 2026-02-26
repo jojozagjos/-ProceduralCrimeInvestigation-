@@ -9,7 +9,7 @@ import { renderChat } from '../chat/chatWidget.js';
 import { renderCorkboard } from '../board/corkboard.js';
 import { renderTimeline } from '../timeline/timelinePanel.js';
 import { renderCinematic } from '../scenes/cinematicScene.js';
-import { renderInterviewScene } from '../scenes/interviewScene.js';
+import { renderInterviewScene, closeInterviewChat } from '../scenes/interviewScene.js';
 import { renderPauseMenu } from '../ui/pauseMenu.js';
 import { getLobbyData } from './lobbyScene.js';
 import type { ServerMessage, GameState, Player } from '../utils/types.js';
@@ -142,6 +142,11 @@ function handleGameMessage(msg: ServerMessage): void {
 
     case 'interview:vote_update':
       updateInterviewVote(msg.data.votes, msg.data.needed);
+      break;
+
+    case 'interview:request_leave':
+      // Show the leave vote modal for all players when someone requests to end
+      showInterviewLeaveVote();
       break;
 
     case 'interview:leave_vote_update':
@@ -379,9 +384,10 @@ function showInterview(suspectId: string): void {
   const overlay = document.getElementById('overlay-container')!;
   renderInterviewScene(overlay, suspectId, state);
   
-  // Setup voting to leave interview
+  // Setup voting to leave interview - send message so all players see the vote modal
   (window as any).requestInterviewEnd = () => {
-    showInterviewLeaveVote();
+    // Send message to server to initiate the vote for all players
+    net.sendRaw({ type: 'interview:request_leave', data: { lobbyId: gameStore.getLobbyId() } });
   };
 }
 
@@ -428,6 +434,7 @@ function showInterviewLeaveVote(): void {
 }
 
 function hideInterview(): void {
+  closeInterviewChat();
   const overlay = document.getElementById('overlay-container')!;
   overlay.innerHTML = '';
   playMusic('music_investigation');

@@ -2419,12 +2419,12 @@ function openCardEditor(card: BoardCard): void {
         w = Math.max(20, startW + dx);
         h = Math.max(20, startH + dy);
       } else if (scaleHandle.includes('tr')) {
-        w = Math.max(20, dx);
+        w = Math.max(20, startW + dx);
         h = Math.max(20, startH - dy);
         item.y = startY + (startH - h);
       } else if (scaleHandle.includes('bl')) {
         w = Math.max(20, startW - dx);
-        h = Math.max(20, dy);
+        h = Math.max(20, startH + dy);
         item.x = startX + (startW - w);
       } else if (scaleHandle.includes('tl')) {
         w = Math.max(20, startW - dx);

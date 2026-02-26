@@ -331,6 +331,13 @@ async function handleMessage(client: ClientSocket, message: ClientMessage): Prom
       break;
     }
 
+    case 'interview:request_leave': {
+      const { lobbyId } = message.data;
+      // Broadcast to all players to show the vote modal
+      broadcastAll(lobbyId, { type: 'interview:request_leave' });
+      break;
+    }
+
     case 'interview:leave_vote': {
       const { lobbyId, vote } = message.data;
       const total = lobbyMgr.getConnectedPlayerCount(lobbyId);

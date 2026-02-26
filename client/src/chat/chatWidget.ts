@@ -6,6 +6,7 @@ import type { ChatMessage, ServerMessage } from '../utils/types.js';
 const messages: ChatMessage[] = [];
 
 export function renderChat(container: HTMLElement, lobbyId: string, collapsible = false): () => void {
+  console.log('[Chat] Rendering chat widget, lobbyId:', lobbyId, 'collapsible:', collapsible);
   container.innerHTML = `
     <div class="chat-widget ${collapsible ? 'collapsible' : ''}">
       ${collapsible ? '<button class="chat-toggle" id="chat-toggle">💬 Chat</button>' : '<h3 class="chat-header">Chat</h3>'}
@@ -36,6 +37,7 @@ export function renderChat(container: HTMLElement, lobbyId: string, collapsible 
   const send = () => {
     const text = input.value.trim();
     if (!text) return;
+    console.log('[Chat] Sending message:', text, 'to lobby:', lobbyId);
     net.sendChat(lobbyId, text);
     input.value = '';
   };
@@ -45,6 +47,7 @@ export function renderChat(container: HTMLElement, lobbyId: string, collapsible 
 
   const unsub = net.onMessage((msg: ServerMessage) => {
     if (msg.type === 'chat:message') {
+      console.log('[Chat] Received chat message:', msg.data);
       addChatMessage(msg.data);
     }
   });

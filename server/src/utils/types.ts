@@ -289,6 +289,7 @@ export type ClientMessage =
   | { type: 'interview:vote'; data: { lobbyId: string; vote: boolean } }
   | { type: 'interview:answer'; data: { lobbyId: string; category: InterviewCategory; evidenceId?: string } }
   | { type: 'interview:end'; data: { lobbyId: string } }
+  | { type: 'interview:request_leave'; data: { lobbyId: string } }
   | { type: 'interview:leave_vote'; data: { lobbyId: string; vote: boolean } }
   | { type: 'timeline:op'; data: { lobbyId: string; op: 'discover'; eventId: string } }
   | { type: 'board:op'; data: { lobbyId: string; op: BoardOp } }
@@ -332,6 +333,7 @@ export type ServerMessage =
   | { type: 'interview:requested'; data: { suspectId: string; requesterId: string; requesterName: string } }
   | { type: 'interview:vote_update'; data: { votes: Record<string, boolean>; needed: number } }
   | { type: 'interview:leave_vote_update'; data: { votes: Record<string, boolean>; needed: number } }
+  | { type: 'interview:request_leave' }
   | { type: 'interview:start'; data: { suspectId: string } }
   | { type: 'interview:response'; data: { question: string; answer: string; category: InterviewCategory } }
   | { type: 'interview:ended' }

@@ -264,6 +264,7 @@ export type ServerMessage =
   | { type: 'cinematic:end' }
   | { type: 'interview:requested'; data: { suspectId: string; requesterId: string; requesterName: string } }
   | { type: 'interview:vote_update'; data: { votes: Record<string, boolean>; needed: number } }
+  | { type: 'interview:request_leave' }
   | { type: 'interview:leave_vote_update'; data: { votes: Record<string, boolean>; needed: number } }
   | { type: 'interview:start'; data: { suspectId: string } }
   | { type: 'interview:response'; data: { question: string; answer: string; category: InterviewCategory } }

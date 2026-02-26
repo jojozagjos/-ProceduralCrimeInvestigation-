@@ -6,6 +6,8 @@ import { renderChat } from '../chat/chatWidget.js';
 import { INTERVIEW_CATEGORIES } from '../utils/types.js';
 import type { GameState, InterviewCategory, Evidence } from '../utils/types.js';
 
+let chatCleanup: (() => void) | null = null;
+
 export function renderInterviewScene(
   container: HTMLElement,
   suspectId: string,
@@ -112,8 +114,20 @@ export function renderInterviewScene(
 
   // Render chat
   const chatArea = document.getElementById('interview-chat-area');
+  console.log('[Interview] Chat area element:', chatArea);
+  console.log('[Interview] Lobby ID:', gameStore.getLobbyId());
   if (chatArea) {
-    renderChat(chatArea, gameStore.getLobbyId(), false);
+    chatCleanup = renderChat(chatArea, gameStore.getLobbyId(), false);
+    console.log('[Interview] Chat widget rendered successfully');
+  } else {
+    console.error('[Interview] Chat area element not found!');
+  }
+}
+
+export function closeInterviewChat(): void {
+  if (chatCleanup) {
+    chatCleanup();
+    chatCleanup = null;
   }
 }
 
