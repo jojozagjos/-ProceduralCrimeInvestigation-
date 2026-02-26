@@ -17,6 +17,7 @@ import type { ServerMessage, GameState, Player } from '../utils/types.js';
 let unsub: (() => void) | null = null;
 let storeSub: (() => void) | null = null;
 let chatCleanup: (() => void) | null = null;
+let accusationChatCleanup: (() => void) | null = null;
 let pauseVisible = false;
 let interviewVoteTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -782,7 +783,6 @@ function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: st
   const state = gameStore.getState();
   if (!state) return;
 
-  const playerId = (globalThis as any).clientPlayerId || '';
   const initiatorName = state.players?.find(p => p.id === initiatorId)?.displayName || 'A player';
   const playerVote = (globalThis as any).accusationFinalVote;
   const finalVotes = state.accusationFinalVotes || {};
@@ -793,93 +793,108 @@ function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: st
   const cancelVotes = Object.values(finalVotes).filter(v => v === 'cancel').length;
   const pendingVotes = totalPlayers - Object.keys(finalVotes).length;
 
+  if (accusationChatCleanup) {
+    accusationChatCleanup();
+    accusationChatCleanup = null;
+  }
+
+  const suspectName = state.caseData.suspects.find(s => s.id === draft.suspectId)?.name || 'Unknown';
+
   const overlay = document.getElementById('overlay-container')!;
   overlay.innerHTML = `
-    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000;">
-      <div style="width: 90%; max-width: 700px; max-height: 90vh; background: #1a1a1a; 
-                  border: 2px solid var(--accent); border-radius: 8px; padding: 24px; 
-                  overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
-        <h2 style="margin: 0 0 8px 0; color: var(--accent);">🎯 Final Accusation</h2>
-        <p style="margin: 0 0 20px 0; color: var(--text-muted); font-size: 14px;">
-          ${escHtml(initiatorName)} initiated the accusation. All investigators can edit the details and vote.
-        </p>
-
-        <!-- Form Section -->
-        <form id="accusation-form" style="margin-bottom: 24px;">
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; color: var(--text); font-weight: 600;">Who is the culprit?</label>
-            <select id="acc-suspect" style="width: 100%; padding: 8px; background: #2a2a2a; color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-size: 14px;">
-              ${state.caseData.suspects.map(s => `<option value="${s.id}" ${s.id === draft.suspectId ? 'selected' : ''}>${escHtml(s.name)}</option>`).join('')}
-            </select>
+    <div class="accusation-fullscreen">
+      <div class="accusation-background"></div>
+      <div class="accusation-content">
+        <div class="accusation-left">
+          <div class="accusation-header">
+            <h2>Final Accusation</h2>
+            <p>${escHtml(initiatorName)} initiated the accusation. Everyone can edit and vote.</p>
           </div>
 
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; color: var(--text); font-weight: 600;">What was their motive?</label>
-            <select id="acc-motive" style="width: 100%; padding: 8px; background: #2a2a2a; color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-size: 14px;">
-              <option value="">— Choose a motive —</option>
-              <option value="Money / Financial Gain" ${draft.motive === 'Money / Financial Gain' ? 'selected' : ''}>Money / Financial Gain</option>
-              <option value="Revenge / Jealousy" ${draft.motive === 'Revenge / Jealousy' ? 'selected' : ''}>Revenge / Jealousy</option>
-              <option value="Self-Defense / Protection" ${draft.motive === 'Self-Defense / Protection' ? 'selected' : ''}>Self-Defense / Protection</option>
-              <option value="Crime of Passion" ${draft.motive === 'Crime of Passion' ? 'selected' : ''}>Crime of Passion</option>
-              <option value="Greed / Inheritance" ${draft.motive === 'Greed / Inheritance' ? 'selected' : ''}>Greed / Inheritance</option>
-            </select>
-          </div>
-
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; color: var(--text); font-weight: 600;">How did they commit the crime?</label>
-            <select id="acc-method" style="width: 100%; padding: 8px; background: #2a2a2a; color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-size: 14px;">
-              <option value="">— Choose a method —</option>
-              <option value="Poison" ${draft.method === 'Poison' ? 'selected' : ''}>Poison</option>
-              <option value="Blunt Force Trauma" ${draft.method === 'Blunt Force Trauma' ? 'selected' : ''}>Blunt Force Trauma</option>
-              <option value="Stabbing" ${draft.method === 'Stabbing' ? 'selected' : ''}>Stabbing</option>
-              <option value="Shooting" ${draft.method === 'Shooting' ? 'selected' : ''}>Shooting</option>
-              <option value="Accident / Negligence" ${draft.method === 'Accident / Negligence' ? 'selected' : ''}>Accident / Negligence</option>
-            </select>
-          </div>
-
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; color: var(--text); font-weight: 600;">Supporting Evidence (Optional)</label>
-            <div id="acc-evidence" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-              ${state.caseData.evidence
-                .filter(e => state.discoveredEvidenceIds.includes(e.id))
-                .map(e => `<label style="display: flex; align-items: center; color: var(--text); cursor: pointer; font-size: 13px;">
-                  <input type="checkbox" value="${e.id}" ${draft.evidenceIds.includes(e.id) ? 'checked' : ''} style="margin-right: 6px; cursor: pointer;"> 
-                  ${escHtml(e.title)}
-                </label>`).join('')}
+          <div class="accusation-draft">
+            <div class="draft-title">Live Draft</div>
+            <div class="draft-row">
+              <span class="draft-label">Suspect</span>
+              <span class="draft-value" id="acc-draft-suspect">${escHtml(suspectName)}</span>
+            </div>
+            <div class="draft-row">
+              <span class="draft-label">Motive</span>
+              <span class="draft-value" id="acc-draft-motive">${escHtml(draft.motive || '—')}</span>
+            </div>
+            <div class="draft-row">
+              <span class="draft-label">Method</span>
+              <span class="draft-value" id="acc-draft-method">${escHtml(draft.method || '—')}</span>
             </div>
           </div>
-        </form>
 
-        <!-- Vote Section at Bottom -->
-        <div style="border-top: 1px solid var(--border); padding-top: 20px; padding-bottom: 16px;">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; font-size: 13px;">
-            <div style="padding: 12px; background: #2a2a2a; border-radius: 4px; border-left: 3px solid #4CAF50; text-align: center;">
-              <div style="color: var(--accent); font-weight: 700; font-size: 18px;">${submitVotes}</div>
-              <div style="color: var(--text-muted);">Vote to Submit</div>
-            </div>
-            <div style="padding: 12px; background: #2a2a2a; border-radius: 4px; border-left: 3px solid #f44336; text-align: center;">
-              <div style="color: var(--accent); font-weight: 700; font-size: 18px;">${cancelVotes}</div>
-              <div style="color: var(--text-muted);">Vote to Cancel</div>
-            </div>
-          </div>
-          <div style="padding: 12px; background: #252525; border-radius: 4px; text-align: center; color: var(--text-muted); font-size: 13px; margin-bottom: 16px;">
-            ${pendingVotes} investigator${pendingVotes !== 1 ? 's' : ''} pending
-          </div>
+          <div id="accusation-chat-area" class="accusation-chat"></div>
+        </div>
 
-          <!-- Vote Buttons -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
-            <button id="acc-cancel" style="padding: 10px; background: #2a2a2a; color: var(--text); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s;">
-              Close
-            </button>
-            <button id="acc-vote-submit" style="padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; ${playerVote === 'submit' ? 'opacity: 0.5; cursor: not-allowed;' : 'hover {background: #45a049;}'}"
-              ${playerVote === 'submit' ? 'disabled' : ''}>
-              ${playerVote === 'submit' ? '✓ Voted Submit' : 'Vote Submit'}
-            </button>
-            <button id="acc-vote-cancel" style="padding: 10px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; ${playerVote === 'cancel' ? 'opacity: 0.5; cursor: not-allowed;' : ''}"
-              ${playerVote === 'cancel' ? 'disabled' : ''}>
-              ${playerVote === 'cancel' ? '✓ Voted Cancel' : 'Vote Cancel'}
-            </button>
+        <div class="accusation-right">
+          <form id="accusation-form" class="accusation-form">
+            <div class="accusation-field">
+              <label class="accusation-label">Who is the culprit?</label>
+              <select id="acc-suspect" class="accusation-input">
+                ${state.caseData.suspects.map(s => `<option value="${s.id}" ${s.id === draft.suspectId ? 'selected' : ''}>${escHtml(s.name)}</option>`).join('')}
+              </select>
+            </div>
+
+            <div class="accusation-field">
+              <label class="accusation-label">What was their motive?</label>
+              <select id="acc-motive" class="accusation-input">
+                <option value="">— Choose a motive —</option>
+                <option value="Money / Financial Gain" ${draft.motive === 'Money / Financial Gain' ? 'selected' : ''}>Money / Financial Gain</option>
+                <option value="Revenge / Jealousy" ${draft.motive === 'Revenge / Jealousy' ? 'selected' : ''}>Revenge / Jealousy</option>
+                <option value="Self-Defense / Protection" ${draft.motive === 'Self-Defense / Protection' ? 'selected' : ''}>Self-Defense / Protection</option>
+                <option value="Crime of Passion" ${draft.motive === 'Crime of Passion' ? 'selected' : ''}>Crime of Passion</option>
+                <option value="Greed / Inheritance" ${draft.motive === 'Greed / Inheritance' ? 'selected' : ''}>Greed / Inheritance</option>
+              </select>
+            </div>
+
+            <div class="accusation-field">
+              <label class="accusation-label">How did they commit the crime?</label>
+              <select id="acc-method" class="accusation-input">
+                <option value="">— Choose a method —</option>
+                <option value="Poison" ${draft.method === 'Poison' ? 'selected' : ''}>Poison</option>
+                <option value="Blunt Force Trauma" ${draft.method === 'Blunt Force Trauma' ? 'selected' : ''}>Blunt Force Trauma</option>
+                <option value="Stabbing" ${draft.method === 'Stabbing' ? 'selected' : ''}>Stabbing</option>
+                <option value="Shooting" ${draft.method === 'Shooting' ? 'selected' : ''}>Shooting</option>
+                <option value="Accident / Negligence" ${draft.method === 'Accident / Negligence' ? 'selected' : ''}>Accident / Negligence</option>
+              </select>
+            </div>
+
+            <div class="accusation-field">
+              <label class="accusation-label">Supporting Evidence (Optional)</label>
+              <div id="acc-evidence" class="evidence-checkboxes accusation-evidence">
+                ${state.caseData.evidence
+                  .filter(e => state.discoveredEvidenceIds.includes(e.id))
+                  .map(e => `<label class="check-label"><input type="checkbox" value="${e.id}" ${draft.evidenceIds.includes(e.id) ? 'checked' : ''}> ${escHtml(e.title)}</label>`).join('')}
+              </div>
+            </div>
+          </form>
+
+          <div class="accusation-votes">
+            <div class="accusation-vote-cards">
+              <div class="vote-card vote-submit">
+                <div class="vote-count" id="acc-submit-count">${submitVotes}</div>
+                <div class="vote-label">Vote Submit</div>
+              </div>
+              <div class="vote-card vote-cancel">
+                <div class="vote-count" id="acc-cancel-count">${cancelVotes}</div>
+                <div class="vote-label">Vote Cancel</div>
+              </div>
+            </div>
+            <div class="accusation-pending" id="acc-pending-count">
+              ${pendingVotes} investigator${pendingVotes !== 1 ? 's' : ''} pending
+            </div>
+            <div class="accusation-actions">
+              <button id="acc-vote-submit" class="btn btn-vote-submit" ${playerVote === 'submit' ? 'disabled' : ''}>
+                ${playerVote === 'submit' ? 'Voted Submit' : 'Vote Submit'}
+              </button>
+              <button id="acc-vote-cancel" class="btn btn-vote-cancel" ${playerVote === 'cancel' ? 'disabled' : ''}>
+                ${playerVote === 'cancel' ? 'Voted Cancel' : 'Vote Cancel'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -901,6 +916,8 @@ function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: st
         .filter((cb: Element) => (cb as HTMLInputElement).checked)
         .map((cb: Element) => (cb as HTMLInputElement).value),
     };
+    gameStore.setState({ ...gameStore.getState()!, accusationDraft: newDraft });
+    updateAccusationDraft(newDraft);
     net.updateAccusationDraft(gameStore.getLobbyId(), newDraft);
   };
 
@@ -909,15 +926,10 @@ function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: st
   methodSelect?.addEventListener('change', updateOnChange);
   evidenceCheckboxes.forEach(cb => cb.addEventListener('change', updateOnChange));
 
-  // Close button
-  const closeBtn = document.getElementById('acc-cancel');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
-      net.cancelAccusationVote(gameStore.getLobbyId());
-      const overlay = document.getElementById('overlay-container');
-      if (overlay) overlay.innerHTML = '';
-      (globalThis as any).accusationFinalVote = undefined;
-    });
+  // Render chat
+  const chatArea = document.getElementById('accusation-chat-area');
+  if (chatArea) {
+    accusationChatCleanup = renderChat(chatArea, gameStore.getLobbyId(), false);
   }
 
   // Vote to submit button
@@ -926,7 +938,8 @@ function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: st
     voteSubmitBtn.addEventListener('click', () => {
       net.voteOnAccusation(gameStore.getLobbyId(), 'submit');
       (globalThis as any).accusationFinalVote = 'submit';
-      showCollaborativeAccusation(initiatorId, draft);
+      voteSubmitBtn.setAttribute('disabled', 'true');
+      voteSubmitBtn.textContent = 'Voted Submit';
     });
   }
 
@@ -936,12 +949,15 @@ function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: st
     voteCancelBtn.addEventListener('click', () => {
       net.voteOnAccusation(gameStore.getLobbyId(), 'cancel');
       (globalThis as any).accusationFinalVote = 'cancel';
-      showCollaborativeAccusation(initiatorId, draft);
+      voteCancelBtn.setAttribute('disabled', 'true');
+      voteCancelBtn.textContent = 'Voted Cancel';
     });
   }
 }
 
 function updateAccusationDraft(draft: { suspectId: string; motive: string; method: string; evidenceIds: string[] }): void {
+  gameStore.setState({ ...gameStore.getState()!, accusationDraft: draft });
+
   // Update the form elements in real-time as other players edit
   const suspectSelect = document.getElementById('acc-suspect') as HTMLSelectElement;
   const motiveSelect = document.getElementById('acc-motive') as HTMLSelectElement;
@@ -956,34 +972,42 @@ function updateAccusationDraft(draft: { suspectId: string; motive: string; metho
   evidenceCheckboxes.forEach(cb => {
     (cb as HTMLInputElement).checked = draft.evidenceIds.includes((cb as HTMLInputElement).value);
   });
+
+  const state = gameStore.getState();
+  const suspectName = state?.caseData.suspects.find(s => s.id === draft.suspectId)?.name || 'Unknown';
+  const suspectEl = document.getElementById('acc-draft-suspect');
+  const motiveEl = document.getElementById('acc-draft-motive');
+  const methodEl = document.getElementById('acc-draft-method');
+  if (suspectEl) suspectEl.textContent = suspectName;
+  if (motiveEl) motiveEl.textContent = draft.motive || '—';
+  if (methodEl) methodEl.textContent = draft.method || '—';
 }
 
 function updateAccusationFinalVotes(votes: Record<string, 'submit' | 'cancel'>, needed: number): void {
-  // Update the vote counts at bottom of accusation modal
+  gameStore.setState({ ...gameStore.getState()!, accusationFinalVotes: votes });
+
   const submitCount = Object.values(votes).filter(v => v === 'submit').length;
   const cancelCount = Object.values(votes).filter(v => v === 'cancel').length;
   const pendingCount = needed - Object.keys(votes).length;
 
-  // Update vote displays if they exist
-  const voteCountElements = document.querySelectorAll('#acc-vote-submit, #acc-vote-cancel');
-  
-  // Force re-render the entire accusation screen if it's open
-  const form = document.getElementById('accusation-form');
-  if (form) {
-    // Get the current draft from state
-    const state = gameStore.getState();
-    if (state && state.accusationDraft) {
-      // Find the initiator ID (it's the one who started it, could be in state)
-      const initiatorId = (globalThis as any).accusationInitiatorId || '';
-      showCollaborativeAccusation(initiatorId, state.accusationDraft);
-    }
-  }
+  const submitEl = document.getElementById('acc-submit-count');
+  const cancelEl = document.getElementById('acc-cancel-count');
+  const pendingEl = document.getElementById('acc-pending-count');
+
+  if (submitEl) submitEl.textContent = `${submitCount}`;
+  if (cancelEl) cancelEl.textContent = `${cancelCount}`;
+  if (pendingEl) pendingEl.textContent = `${pendingCount} investigator${pendingCount !== 1 ? 's' : ''} pending`;
 }
 
 function showAccusationResults(data: { correct: boolean; score: number; culpritId: string; playerVotes: Record<string, { suspectId: string; correct: boolean }>; solution: any }): void {
   stopMusic();
   const state = gameStore.getState();
   if (!state) return;
+
+  if (accusationChatCleanup) {
+    accusationChatCleanup();
+    accusationChatCleanup = null;
+  }
 
   (globalThis as any).accusationVoteSubmitted = false;
   (globalThis as any).accusationVoteStatus = null;

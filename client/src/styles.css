@@ -3055,6 +3055,258 @@ textarea.input {
   border-radius: 10px;
 }
 
+/* ─── COLLABORATIVE ACCUSATION ────────────────────────────────────────────── */
+
+.accusation-fullscreen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  color: var(--text);
+}
+
+.accusation-background {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255, 193, 7, 0.15), transparent 45%),
+    radial-gradient(circle at 85% 30%, rgba(0, 188, 212, 0.2), transparent 50%),
+    linear-gradient(135deg, #0c0f14, #121823 40%, #0d141b 100%);
+  opacity: 0.98;
+}
+
+.accusation-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 24px;
+  width: 100%;
+  padding: 32px 40px;
+}
+
+.accusation-left,
+.accusation-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.accusation-header h2 {
+  margin: 0 0 6px 0;
+  font-size: 2rem;
+  font-family: var(--font-heading);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.accusation-header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.accusation-draft {
+  background: rgba(10, 16, 22, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+.draft-title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.draft-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.draft-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.draft-value {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.accusation-chat {
+  flex: 1;
+  min-height: 220px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(8, 12, 18, 0.85);
+  padding: 10px;
+  overflow: hidden;
+}
+
+.accusation-form {
+  display: grid;
+  gap: 14px;
+  background: rgba(14, 20, 28, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+.accusation-field {
+  display: grid;
+  gap: 6px;
+}
+
+.accusation-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.accusation-input {
+  background: rgba(16, 24, 34, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 0.95rem;
+}
+
+.accusation-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+}
+
+.accusation-evidence {
+  max-height: 160px;
+  overflow-y: auto;
+  background: rgba(8, 12, 18, 0.6);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.accusation-votes {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(10, 16, 24, 0.92);
+}
+
+.accusation-vote-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.vote-card {
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  gap: 6px;
+  text-align: center;
+}
+
+.vote-card.vote-submit {
+  border-color: rgba(76, 175, 80, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.3);
+}
+
+.vote-card.vote-cancel {
+  border-color: rgba(244, 67, 54, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(244, 67, 54, 0.3);
+}
+
+.vote-count {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.vote-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.accusation-pending {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.accusation-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.btn-vote-submit,
+.btn-vote-cancel {
+  padding: 10px 14px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.btn-vote-submit {
+  background: linear-gradient(135deg, #4CAF50, #2E7D32);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(76, 175, 80, 0.35);
+}
+
+.btn-vote-cancel {
+  background: linear-gradient(135deg, #F44336, #B71C1C);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(244, 67, 54, 0.35);
+}
+
+.btn-vote-submit:hover,
+.btn-vote-cancel:hover {
+  transform: translateY(-1px);
+}
+
+.btn-vote-submit:disabled,
+.btn-vote-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+@media (max-width: 900px) {
+  .accusation-content {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+}
+
 /* ─── ACCUSATION RESULTS ──────────────────────────────────────────────────── */
 
 .results-reveal {
