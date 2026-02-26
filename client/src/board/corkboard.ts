@@ -2851,6 +2851,7 @@ function openTapeEditor(tape: BoardTape): void {
     if (idx >= 0) textItems.splice(idx, 1);
     clearSelection();
     renderCanvas();
+    queueLiveTapeUpdate();
   });
 
   document.getElementById('btn-add-tape-text')!.addEventListener('click', () => {
@@ -2858,6 +2859,7 @@ function openTapeEditor(tape: BoardTape): void {
     textItems.push({ id, text: 'New text', x: 20, y: 30, w: 60, h: 20, size: 12, color: '#2a1a0a', rotation: 0 });
     renderCanvas();
     setSelected(id);
+    queueLiveTapeUpdate();
   });
 
   renderCanvas();
