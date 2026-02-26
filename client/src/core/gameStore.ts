@@ -60,6 +60,11 @@ class GameStore {
         }
         break;
       }
+      case 'delete_card_animated':
+        // Trigger delete animation - handled by corkboard renderer
+        // Card will be removed after animation completes
+        window.dispatchEvent(new CustomEvent('delete_card_animated', { detail: { cardId: op.cardId } }));
+        break;
       case 'remove_card':
         b.cards = b.cards.filter(c => c.id !== op.cardId);
         b.connections = b.connections.filter(c => c.fromCardId !== op.cardId && c.toCardId !== op.cardId);

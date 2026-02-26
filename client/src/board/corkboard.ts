@@ -18,6 +18,7 @@ let ropeSimulations: Map<string, VerletRope> = new Map();
 let isDragging = false;
 let dragTarget: PIXI.Container | null = null;
 let dragOffset = { x: 0, y: 0 };
+let dragThrottleTimer: ReturnType<typeof setTimeout> | null = null;
 let connectMode = false;
 let connectFromId: string | null = null;
 let deleteMode = false;
@@ -477,6 +478,42 @@ export function renderCorkboard(container: HTMLElement): void {
         const cardId = dragTarget.name;
         if (cardId && !cardId.startsWith('tape_')) {
           updateRopeEndpoints(cardId, dragTarget.x, dragTarget.y);
+          
+          // Send throttled position updates for real-time sync (every 60ms)
+          if (!dragThrottleTimer) {
+            const currentCardId = dragTarget.name;
+            const currentX = dragTarget.x;
+            const currentY = dragTarget.y;
+            dragThrottleTimer = setTimeout(() => {
+              dragThrottleTimer = null;
+              if (isDragging && currentCardId) {
+                net.sendBoardOp(gameStore.getLobbyId(), { 
+                  type: 'move_card', 
+                  cardId: currentCardId, 
+                  x: currentX - PIN_X, 
+                  y: currentY - PIN_HEAD_Y 
+                });
+              }
+            }, 60);
+          }
+        } else if (cardId && cardId.startsWith('tape_')) {
+          // Send throttled updates for tape too
+          if (!dragThrottleTimer) {
+            const currentTapeId = dragTarget.name;
+            const currentX = dragTarget.x;
+            const currentY = dragTarget.y;
+            dragThrottleTimer = setTimeout(() => {
+              dragThrottleTimer = null;
+              if (isDragging && currentTapeId) {
+                net.sendBoardOp(gameStore.getLobbyId(), { 
+                  type: 'move_tape', 
+                  tapeId: currentTapeId,
+                  x: currentX,
+                  y: currentY
+                });
+              }
+            }, 60);
+          }
         }
       }
     });
@@ -693,6 +730,17 @@ export function renderCorkboard(container: HTMLElement): void {
     // Subscribe to store updates
     const unsub = gameStore.subscribe(() => syncBoard());
     syncBoard();
+
+    // Listen for delete_card_animated events from other players
+    window.addEventListener('delete_card_animated', (e: Event) => {
+      const customEvent = e as CustomEvent<{ cardId: string }>;
+      const cardId = customEvent.detail.cardId;
+      // Only trigger animation if we didn't initiate it (check if sprite is not already deleting)
+      const sprite = cardSprites.get(cardId);
+      if (sprite && !(sprite as any)._isDeleting) {
+        startCardDeletion(cardId);
+      }
+    });
 
     let currentTextResolution = Math.min(8, Math.max(2, window.devicePixelRatio || 1));
 
@@ -1304,7 +1352,10 @@ function startCardDeletion(cardId: string): void {
     vr: (Math.random() - 0.5) * 0.05
   };
   
-  // Send the actual delete op after animation completes
+  // Send delete_card_animated immediately so other players see the animation
+  sendBoardOpWithHistory({ type: 'delete_card_animated', cardId });
+  
+  // Send the actual remove_card op after animation completes
   setTimeout(() => {
     sendBoardOpWithHistory({ type: 'remove_card', cardId });
   }, 4200);
@@ -2216,6 +2267,8 @@ function openCardEditor(card: BoardCard): void {
   let startH = 0;
   let startX = 0;
   let startY = 0;
+  let startMouseX = 0;
+  let startMouseY = 0;
 
   selectionBox.addEventListener('mousedown', (e) => {
     e.stopPropagation();
@@ -2247,6 +2300,8 @@ function openCardEditor(card: BoardCard): void {
       startH = size.h;
       startX = item.x;
       startY = item.y;
+      startMouseX = e.clientX;
+      startMouseY = e.clientY;
     }
   });
 
@@ -2270,9 +2325,9 @@ function openCardEditor(card: BoardCard): void {
       return;
     }
     if (scaleHandle) {
-      // Raw mouse delta
-      let dx = e.clientX - rect.left - startX;
-      let dy = e.clientY - rect.top - startY;
+      // Calculate mouse delta from the starting mouse position
+      let dx = e.clientX - startMouseX;
+      let dy = e.clientY - startMouseY;
       
       // Account for item rotation by rotating the delta backwards
       const rotationRad = ((item.rotation || 0) * Math.PI) / 180;
@@ -2284,8 +2339,8 @@ function openCardEditor(card: BoardCard): void {
       let w = startW;
       let h = startH;
       if (scaleHandle.includes('br')) {
-        w = Math.max(20, dx);
-        h = Math.max(20, dy);
+        w = Math.max(20, startW + dx);
+        h = Math.max(20, startH + dy);
       } else if (scaleHandle.includes('tr')) {
         w = Math.max(20, dx);
         h = Math.max(20, startH - dy);
@@ -2824,6 +2879,8 @@ function openTapeEditor(tape: BoardTape): void {
   let startH = 0;
   let startX = 0;
   let startY = 0;
+  let startMouseX = 0;
+  let startMouseY = 0;
 
   selectionBox.addEventListener('mousedown', (e) => {
     e.stopPropagation();
@@ -2855,6 +2912,8 @@ function openTapeEditor(tape: BoardTape): void {
     startH = size.h;
     startX = item.x;
     startY = item.y;
+    startMouseX = e.clientX;
+    startMouseY = e.clientY;
   });
 
   window.addEventListener('mousemove', (e) => {
@@ -2877,8 +2936,9 @@ function openTapeEditor(tape: BoardTape): void {
       return;
     }
     if (scaleHandle) {
-      let dx = e.clientX - rect.left - startX;
-      let dy = e.clientY - rect.top - startY;
+      // Calculate mouse delta from the starting mouse position
+      let dx = e.clientX - startMouseX;
+      let dy = e.clientY - startMouseY;
       
       const rotationRad = ((item.rotation || 0) * Math.PI) / 180;
       const rotatedDx = dx * Math.cos(-rotationRad) - dy * Math.sin(-rotationRad);
@@ -2889,15 +2949,15 @@ function openTapeEditor(tape: BoardTape): void {
       let w = startW;
       let h = startH;
       if (scaleHandle.includes('br')) {
-        w = Math.max(20, dx);
-        h = Math.max(20, dy);
+        w = Math.max(20, startW + dx);
+        h = Math.max(20, startH + dy);
       } else if (scaleHandle.includes('tr')) {
-        w = Math.max(20, dx);
+        w = Math.max(20, startW + dx);
         h = Math.max(20, startH - dy);
         item.y = startY + (startH - h);
       } else if (scaleHandle.includes('bl')) {
         w = Math.max(20, startW - dx);
-        h = Math.max(20, dy);
+        h = Math.max(20, startH + dy);
         item.x = startX + (startW - w);
       } else if (scaleHandle.includes('tl')) {
         w = Math.max(20, startW - dx);

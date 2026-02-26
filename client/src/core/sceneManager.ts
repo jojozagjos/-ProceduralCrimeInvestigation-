@@ -1,7 +1,7 @@
 // ─── Scene Manager ───────────────────────────────────────────────────────────
 // Manages transitions between HTML overlay scenes.
 
-type SceneName = 'main-menu' | 'play' | 'lobby' | 'game' | 'settings' | 'tutorial' | 'credits';
+type SceneName = 'main-menu' | 'play' | 'lobby' | 'game' | 'settings' | 'tutorial' | 'credits' | 'splash';
 
 let currentScene: SceneName = 'main-menu';
 const sceneStack: SceneName[] = [];
