@@ -282,6 +282,7 @@ export type ServerMessage =
   | { type: 'accusation:opened'; data: { initiatorId: string; draft: { suspectId: string; motive: string; method: string; evidenceIds: string[] } } }
   | { type: 'accusation:draft_update'; data: { suspectId: string; motive: string; method: string; evidenceIds: string[] } }
   | { type: 'accusation:final_votes'; data: { votes: Record<string, 'submit' | 'cancel'>; needed: number } }
+  | { type: 'accusation:closed'; data: { reason: 'cancelled' } }
   | { type: 'accusation:results'; data: { correct: boolean; score: number; culpritId: string; playerVotes: Record<string, { suspectId: string; correct: boolean }>; solution: GameState['caseData']['solution'] } }
   | { type: 'game:end'; data: { won: boolean; score: number; solution: GameState['caseData']['solution'] } }
   | { type: 'error'; data: { message: string } }

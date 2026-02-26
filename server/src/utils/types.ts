@@ -298,7 +298,7 @@ export type ClientMessage =
   | { type: 'board:op'; data: { lobbyId: string; op: BoardOp } }
   | { type: 'accusation:open'; data: { lobbyId: string } }
   | { type: 'accusation:update_draft'; data: { lobbyId: string; draft: { suspectId: string; motive: string; method: string; evidenceIds: string[] } } }
-  | { type: 'accusation:vote_final'; data: { lobbyId: string; vote: 'submit' | 'cancel' } }
+  | { type: 'accusation:vote_final'; data: { lobbyId: string; vote: 'submit' | 'cancel' | null } }
   | { type: 'accusation:submit'; data: { lobbyId: string; accusation: z.infer<typeof AccusationSchema> } }
   | { type: 'accusation:cancel'; data: { lobbyId: string } }
   | { type: 'evidence:discover'; data: { lobbyId: string; evidenceId: string } }
@@ -353,6 +353,7 @@ export type ServerMessage =
   | { type: 'accusation:opened'; data: { initiatorId: string; draft: { suspectId: string; motive: string; method: string; evidenceIds: string[] } } }
   | { type: 'accusation:draft_update'; data: { suspectId: string; motive: string; method: string; evidenceIds: string[] } }
   | { type: 'accusation:final_votes'; data: { votes: Record<string, 'submit' | 'cancel'>; needed: number } }
+  | { type: 'accusation:closed'; data: { reason: 'cancelled' } }
   | { type: 'accusation:results'; data: { correct: boolean; score: number; culpritId: string; playerVotes: Record<string, { suspectId: string; correct: boolean }>; solution: GameState['caseData']['solution'] } }
   | { type: 'game:end'; data: { won: boolean; score: number; solution: GameState['caseData']['solution'] } }
   | { type: 'error'; data: { message: string } }

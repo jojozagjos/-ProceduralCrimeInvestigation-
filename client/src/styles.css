@@ -3168,6 +3168,12 @@ textarea.input {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
 }
 
+.accusation-form.accusation-locked {
+  border-color: rgba(255, 193, 7, 0.5);
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.15), 0 12px 28px rgba(0, 0, 0, 0.45);
+  opacity: 0.85;
+}
+
 .accusation-field {
   display: grid;
   gap: 6px;

@@ -463,8 +463,14 @@ async function handleMessage(client: ClientSocket, message: ClientMessage): Prom
       const { lobbyId, vote } = message.data;
       const game = gameMgr.getGame(lobbyId);
       if (game) {
-        game.accusationFinalVotes[client.playerId] = vote;
-        const total = lobbyMgr.getConnectedPlayerCount(lobbyId);
+        if (vote === null) {
+          delete game.accusationFinalVotes[client.playerId];
+        } else {
+          game.accusationFinalVotes[client.playerId] = vote;
+        }
+
+        const lobby = lobbyMgr.getLobby(lobbyId);
+        const total = lobby ? lobby.players.length : lobbyMgr.getConnectedPlayerCount(lobbyId);
         
         broadcastAll(lobbyId, {
           type: 'accusation:final_votes',
@@ -479,11 +485,35 @@ async function handleMessage(client: ClientSocket, message: ClientMessage): Prom
           if (submitVotes >= Math.ceil(total / 2)) {
             // Majority voted to submit
             if (game.accusationDraft) {
-              const voteStatus = gameMgr.submitAccusation(lobbyId, game.accusationDraft.initiatorId, game.accusationDraft.suspectId, game.accusationDraft.motive, game.accusationDraft.method, game.accusationDraft.evidenceIds);
-              if (voteStatus) {
+              if (lobby) {
+                for (const player of lobby.players) {
+                  game.accusationVotes[player.id] = {
+                    suspectId: game.accusationDraft.suspectId,
+                    motive: game.accusationDraft.motive,
+                    method: game.accusationDraft.method,
+                    evidenceIds: game.accusationDraft.evidenceIds,
+                  };
+                }
+              } else {
+                game.accusationVotes[game.accusationDraft.initiatorId] = {
+                  suspectId: game.accusationDraft.suspectId,
+                  motive: game.accusationDraft.motive,
+                  method: game.accusationDraft.method,
+                  evidenceIds: game.accusationDraft.evidenceIds,
+                };
+              }
+
+              const results = gameMgr.checkAccusationResults(lobbyId);
+              if (results) {
                 broadcastAll(lobbyId, {
-                  type: 'accusation:vote_status',
-                  data: { votesReceived: voteStatus.votesReceived, votesNeeded: voteStatus.votesNeeded },
+                  type: 'accusation:results',
+                  data: {
+                    correct: results.correct,
+                    score: results.score,
+                    culpritId: results.culpritId,
+                    playerVotes: results.playerVotes,
+                    solution: game.caseData.solution,
+                  },
                 });
               }
             }
@@ -491,6 +521,10 @@ async function handleMessage(client: ClientSocket, message: ClientMessage): Prom
             // Majority voted to cancel - reset draft
             game.accusationDraft = undefined;
             game.accusationFinalVotes = {};
+            broadcastAll(lobbyId, {
+              type: 'accusation:closed',
+              data: { reason: 'cancelled' },
+            });
           }
         }
       }

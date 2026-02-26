@@ -204,7 +204,7 @@ export function updateAccusationDraft(lobbyId: string, draft: { suspectId: strin
   sendRaw({ type: 'accusation:update_draft', data: { lobbyId, draft } });
 }
 
-export function voteOnAccusation(lobbyId: string, vote: 'submit' | 'cancel'): void {
+export function voteOnAccusation(lobbyId: string, vote: 'submit' | 'cancel' | null): void {
   sendRaw({ type: 'accusation:vote_final', data: { lobbyId, vote } });
 }
 

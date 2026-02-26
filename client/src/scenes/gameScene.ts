@@ -253,6 +253,10 @@ function handleGameMessage(msg: ServerMessage): void {
       updateAccusationFinalVotes(msg.data.votes, msg.data.needed);
       break;
 
+    case 'accusation:closed':
+      closeAccusationScreen();
+      break;
+
     case 'accusation:results':
       showAccusationResults(msg.data);
       break;
@@ -779,12 +783,38 @@ function getLobbyPlayerCount(): number {
   return lobbyData?.players?.length || 1;
 }
 
+function closeAccusationScreen(): void {
+  if (accusationChatCleanup) {
+    accusationChatCleanup();
+    accusationChatCleanup = null;
+  }
+  const overlay = document.getElementById('overlay-container');
+  if (overlay) overlay.innerHTML = '';
+  (globalThis as any).accusationFinalVote = undefined;
+  (globalThis as any).accusationInitiatorId = undefined;
+  const state = gameStore.getState();
+  if (state) {
+    gameStore.setState({ ...state, accusationDraft: undefined, accusationFinalVotes: {} });
+  }
+}
+
+function setAccusationEditLocked(locked: boolean): void {
+  const fields = document.querySelectorAll('#accusation-form select, #accusation-form input[type="checkbox"]');
+  fields.forEach(el => {
+    (el as HTMLInputElement | HTMLSelectElement).disabled = locked;
+  });
+  const form = document.getElementById('accusation-form');
+  if (form) {
+    if (locked) form.classList.add('accusation-locked');
+    else form.classList.remove('accusation-locked');
+  }
+}
+
 function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: string; motive: string; method: string; evidenceIds: string[] }): void {
   const state = gameStore.getState();
   if (!state) return;
 
   const initiatorName = state.players?.find(p => p.id === initiatorId)?.displayName || 'A player';
-  const playerVote = (globalThis as any).accusationFinalVote;
   const finalVotes = state.accusationFinalVotes || {};
   const totalPlayers = state.players?.length || 1;
 
@@ -888,12 +918,8 @@ function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: st
               ${pendingVotes} investigator${pendingVotes !== 1 ? 's' : ''} pending
             </div>
             <div class="accusation-actions">
-              <button id="acc-vote-submit" class="btn btn-vote-submit" ${playerVote === 'submit' ? 'disabled' : ''}>
-                ${playerVote === 'submit' ? 'Voted Submit' : 'Vote Submit'}
-              </button>
-              <button id="acc-vote-cancel" class="btn btn-vote-cancel" ${playerVote === 'cancel' ? 'disabled' : ''}>
-                ${playerVote === 'cancel' ? 'Voted Cancel' : 'Vote Cancel'}
-              </button>
+              <button id="acc-vote-submit" class="btn btn-vote-submit">Vote Submit</button>
+              <button id="acc-vote-cancel" class="btn btn-vote-cancel">Vote Cancel</button>
             </div>
           </div>
         </div>
@@ -932,14 +958,49 @@ function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: st
     accusationChatCleanup = renderChat(chatArea, gameStore.getLobbyId(), false);
   }
 
+  const getCurrentVote = (): 'submit' | 'cancel' | undefined => (globalThis as any).accusationFinalVote;
+  const syncVoteUi = (): void => {
+    const submitBtn = document.getElementById('acc-vote-submit') as HTMLButtonElement | null;
+    const cancelBtn = document.getElementById('acc-vote-cancel') as HTMLButtonElement | null;
+    const currentVote = getCurrentVote();
+
+    if (!submitBtn || !cancelBtn) return;
+
+    if (currentVote === 'submit') {
+      submitBtn.textContent = 'Unvote Submit';
+      submitBtn.disabled = false;
+      cancelBtn.textContent = 'Vote Cancel';
+      cancelBtn.disabled = true;
+    } else if (currentVote === 'cancel') {
+      cancelBtn.textContent = 'Unvote Cancel';
+      cancelBtn.disabled = false;
+      submitBtn.textContent = 'Vote Submit';
+      submitBtn.disabled = true;
+    } else {
+      submitBtn.textContent = 'Vote Submit';
+      cancelBtn.textContent = 'Vote Cancel';
+      submitBtn.disabled = false;
+      cancelBtn.disabled = false;
+    }
+
+    setAccusationEditLocked(Boolean(currentVote));
+  };
+
+  syncVoteUi();
+
   // Vote to submit button
   const voteSubmitBtn = document.getElementById('acc-vote-submit');
   if (voteSubmitBtn) {
     voteSubmitBtn.addEventListener('click', () => {
-      net.voteOnAccusation(gameStore.getLobbyId(), 'submit');
-      (globalThis as any).accusationFinalVote = 'submit';
-      voteSubmitBtn.setAttribute('disabled', 'true');
-      voteSubmitBtn.textContent = 'Voted Submit';
+      const currentVote = getCurrentVote();
+      if (currentVote === 'submit') {
+        net.voteOnAccusation(gameStore.getLobbyId(), null);
+        (globalThis as any).accusationFinalVote = undefined;
+      } else if (!currentVote) {
+        net.voteOnAccusation(gameStore.getLobbyId(), 'submit');
+        (globalThis as any).accusationFinalVote = 'submit';
+      }
+      syncVoteUi();
     });
   }
 
@@ -947,10 +1008,15 @@ function showCollaborativeAccusation(initiatorId: string, draft: { suspectId: st
   const voteCancelBtn = document.getElementById('acc-vote-cancel');
   if (voteCancelBtn) {
     voteCancelBtn.addEventListener('click', () => {
-      net.voteOnAccusation(gameStore.getLobbyId(), 'cancel');
-      (globalThis as any).accusationFinalVote = 'cancel';
-      voteCancelBtn.setAttribute('disabled', 'true');
-      voteCancelBtn.textContent = 'Voted Cancel';
+      const currentVote = getCurrentVote();
+      if (currentVote === 'cancel') {
+        net.voteOnAccusation(gameStore.getLobbyId(), null);
+        (globalThis as any).accusationFinalVote = undefined;
+      } else if (!currentVote) {
+        net.voteOnAccusation(gameStore.getLobbyId(), 'cancel');
+        (globalThis as any).accusationFinalVote = 'cancel';
+      }
+      syncVoteUi();
     });
   }
 }
@@ -981,6 +1047,8 @@ function updateAccusationDraft(draft: { suspectId: string; motive: string; metho
   if (suspectEl) suspectEl.textContent = suspectName;
   if (motiveEl) motiveEl.textContent = draft.motive || '—';
   if (methodEl) methodEl.textContent = draft.method || '—';
+
+  setAccusationEditLocked(Boolean((globalThis as any).accusationFinalVote));
 }
 
 function updateAccusationFinalVotes(votes: Record<string, 'submit' | 'cancel'>, needed: number): void {
