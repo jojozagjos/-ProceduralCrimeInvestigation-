@@ -2444,9 +2444,11 @@ textarea.input {
   color: #2a1a0a;
   pointer-events: none;
   z-index: 1;
-  white-space: nowrap;
+  /* Allow the title to wrap within the note canvas */
+  white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 .note-canvas canvas {

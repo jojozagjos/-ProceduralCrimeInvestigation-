@@ -548,7 +548,7 @@ export function renderCorkboard(container: HTMLElement): void {
         title: 'Note',
         content: '',
         noteColor: '#fffacd',
-        textItems: [{ id: `txt_${Math.random().toString(36).slice(2, 8)}`, text: 'Click to edit...', x: 20, y: 40, w: 160, h: 70, size: 14, color: '#2a1a0a', rotation: 0 }],
+        textItems: [],
         imageItems: [],
         x: 200 + Math.random() * 300,
         y: 200 + Math.random() * 200,
