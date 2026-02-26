@@ -52,6 +52,8 @@ const tapePhysics = new Map<string, {
   oldY: number;
   rotation: number;
   vr: number;
+  targetX?: number;
+  targetY?: number;
   isDeleting?: boolean;
   deleteStartTime?: number;
 }>();
@@ -832,6 +834,28 @@ export function renderCorkboard(container: HTMLElement): void {
       
       // No rotation when not deleting - cards stay upright
       sprite.rotation = 0;
+      
+      // Lerp to target position for smooth remote drag updates
+      if (physics.targetX !== undefined && physics.targetY !== undefined) {
+        const lerpFactor = 0.3; // Smooth interpolation
+        sprite.x += (physics.targetX - sprite.x) * lerpFactor;
+        sprite.y += (physics.targetY - sprite.y) * lerpFactor;
+        
+        // Clear target if we're close enough
+        const distance = Math.sqrt(
+          Math.pow(physics.targetX - sprite.x, 2) + 
+          Math.pow(physics.targetY - sprite.y, 2)
+        );
+        if (distance < 0.5) {
+          sprite.x = physics.targetX;
+          sprite.y = physics.targetY;
+          physics.targetX = undefined;
+          physics.targetY = undefined;
+        }
+        
+        physics.lastX = sprite.x;
+        physics.lastY = sprite.y;
+      }
     }
     
     // Update tape physics
@@ -871,6 +895,28 @@ export function renderCorkboard(container: HTMLElement): void {
           tapeContainer.removeChild(sprite);
           tapeSprites.delete(tapeId);
           tapePhysics.delete(tapeId);
+        }
+      } else {
+        // Lerp to target position for smooth remote drag updates
+        if (physics.targetX !== undefined && physics.targetY !== undefined) {
+          const lerpFactor = 0.3; // Smooth interpolation
+          sprite.x += (physics.targetX - sprite.x) * lerpFactor;
+          sprite.y += (physics.targetY - sprite.y) * lerpFactor;
+          
+          // Clear target if we're close enough
+          const distance = Math.sqrt(
+            Math.pow(physics.targetX - sprite.x, 2) + 
+            Math.pow(physics.targetY - sprite.y, 2)
+          );
+          if (distance < 0.5) {
+            sprite.x = physics.targetX;
+            sprite.y = physics.targetY;
+            physics.targetX = undefined;
+            physics.targetY = undefined;
+          }
+          
+          physics.x = sprite.x;
+          physics.y = sprite.y;
         }
       }
     }
@@ -1163,17 +1209,26 @@ function syncBoard(): void {
     } else {
       // Update position and text
       const sprite = cardSprites.get(card.id)!;
-      sprite.x = card.x + PIN_X;
-      sprite.y = card.y + PIN_HEAD_Y;
+      const targetX = card.x + PIN_X;
+      const targetY = card.y + PIN_HEAD_Y;
       updateCardSprite(sprite, card);
       
       // Update physics position tracking
       const physics = cardPhysics.get(card.id);
       if (physics && !physics.isDeleting) {
-        physics.lastX = sprite.x;
-        physics.lastY = sprite.y;
-        physics.oldX = sprite.x;
-        physics.oldY = sprite.y;
+        // Set target position for lerping if not currently being dragged by this client
+        if (dragTarget?.name !== card.id) {
+          physics.targetX = targetX;
+          physics.targetY = targetY;
+        } else {
+          // If we're dragging it, update immediately
+          sprite.x = targetX;
+          sprite.y = targetY;
+          physics.lastX = sprite.x;
+          physics.lastY = sprite.y;
+          physics.oldX = sprite.x;
+          physics.oldY = sprite.y;
+        }
       }
     }
     existingIds.delete(card.id);
@@ -1247,14 +1302,27 @@ function syncBoard(): void {
             newSprite.rotation = oldRotation;
           }
         } else {
-          // Just update position/rotation
-          existingSprite.x = tape.x;
-          existingSprite.y = tape.y;
+          // Just update position/rotation - use target for lerping
+          if (physics) {
+            // Set target position for lerping if not currently being dragged by this client
+            if (dragTarget?.name !== tape.id) {
+              physics.targetX = tape.x;
+              physics.targetY = tape.y;
+            } else {
+              // If we're dragging it, update immediately
+              existingSprite.x = tape.x;
+              existingSprite.y = tape.y;
+              physics.x = tape.x;
+              physics.y = tape.y;
+              physics.oldX = tape.x;
+              physics.oldY = tape.y;
+            }
+          }
           existingSprite.rotation = (tape.rotation * Math.PI) / 180;
         }
         
-        // Update physics position to match
-        if (physics) {
+        // Update physics position to match (if not using targets)
+        if (physics && physics.targetX === undefined) {
           physics.x = tape.x;
           physics.y = tape.y;
           physics.oldX = tape.x;
