@@ -353,50 +353,69 @@ export function generateInterviewResponse(
 ): string {
   const rand = rng || Math.random;
   const isGuilty = suspect.isGuilty;
-  const isDeceptive = isGuilty && rand() > 0.3;
+  const isDeceptive = isGuilty && rand() > 0.4; // Less likely to show obvious deception
   const personality = suspect.personality;
+
+  // Add subtle tells that could apply to innocent or guilty
+  const subtleTells = [
+    'They pause before answering.',
+    'They take a moment to collect their thoughts.',
+    'They maintain steady eye contact.',
+    'They glance away briefly.',
+    'Their expression is difficult to read.',
+    'They answer without hesitation.',
+    'They seem to consider their words carefully.'
+  ];
 
   let response = '';
 
   switch (category) {
     case 'alibi':
       if (isGuilty && isDeceptive) {
-        response = `*${personality}* "${suspect.alibi}" ${rand() > 0.5 ? 'They fidget slightly while speaking.' : 'Their eyes dart away briefly.'}`;
+        response = `*${personality}* "${suspect.alibi}" ${rand() > 0.7 ? subtleTells[Math.floor(rand() * subtleTells.length)] : ''}`;
+      } else if (isGuilty) {
+        // Guilty but not deceptive - seems confident
+        response = `"${suspect.alibi}" ${subtleTells[Math.floor(rand() * subtleTells.length)]}`;
       } else {
-        response = `"${suspect.alibi}" ${!isGuilty ? 'They seem confident and relaxed.' : 'Something about their tone seems rehearsed.'}`;
+        // Innocent but might seem nervous
+        response = `"${suspect.alibi}" ${rand() > 0.5 ? subtleTells[Math.floor(rand() * subtleTells.length)] : 'They seem matter-of-fact about it.'}`;
       }
       break;
 
     case 'relationship':
       if (isGuilty) {
-        response = `"${caseData.victimName}? We were... ${suspect.relationship}s. It was complicated. But I would never..." ${isDeceptive ? 'They trail off unconvincingly.' : 'They seem genuinely upset.'}`;
+        response = `"${caseData.victimName}? We were... ${suspect.relationship}s. ${rand() > 0.5 ? 'It was complicated.' : 'We had our ups and downs.'}" ${isDeceptive && rand() > 0.6 ? 'They seem reluctant to elaborate.' : subtleTells[Math.floor(rand() * subtleTells.length)]}`;
       } else {
-        response = `"I knew ${caseData.victimName} as a ${suspect.relationship}. We got along for the most part. ${rand() > 0.5 ? 'I can\'t believe what happened.' : 'It\'s a real tragedy.'}"`;
+        // Innocent but relationship might have been complicated anyway
+        response = `"I knew ${caseData.victimName} as a ${suspect.relationship}. ${rand() > 0.4 ? 'We had our differences, like anyone.' : 'We got along well enough.'}" ${subtleTells[Math.floor(rand() * subtleTells.length)]}`;
       }
       break;
 
     case 'conflicts':
       if (isGuilty) {
-        const admission = isDeceptive ? 'denies any serious disagreements' : 'admits to some tension';
-        response = `${suspect.name} ${admission} with ${caseData.victimName}. "${rand() > 0.5 ? 'Everyone has disagreements. It was nothing serious.' : 'We had our differences, but it was strictly professional.'}" ${isDeceptive ? 'A bead of sweat forms on their brow.' : ''}`;
+        const admission = rand() > 0.5 ? 'acknowledges some tension' : 'downplays any disagreements';
+        response = `${suspect.name} ${admission} with ${caseData.victimName}. "${rand() > 0.5 ? 'We didn\'t always see eye to eye.' : 'There were occasional disagreements, nothing unusual.'}" ${subtleTells[Math.floor(rand() * subtleTells.length)]}`;
       } else {
-        response = `"Honestly, I didn't have any real problems with ${caseData.victimName}. ${rand() > 0.5 ? 'They could be difficult sometimes, but who isn\'t?' : 'We kept things civil.'}"`;
+        // Innocent but might have had conflicts too
+        response = `"${rand() > 0.6 ? 'We had our disagreements, sure.' : 'I wouldn\'t say we were best friends.'} ${caseData.victimName} could be difficult to work with at times." ${subtleTells[Math.floor(rand() * subtleTells.length)]}`;
       }
       break;
 
     case 'financial':
-      if (isGuilty && caseData.solution.motive.includes('greed') || caseData.solution.motive.includes('insurance') || caseData.solution.motive.includes('inheritance')) {
-        response = `"My finances are my own business." ${isDeceptive ? 'They become visibly agitated.' : 'They shift uncomfortably.'} ${rand() > 0.5 ? '"Fine. Things have been tight lately, but that has nothing to do with this."' : '"I don\'t see how that\'s relevant to your investigation."'}`;
+      if (isGuilty && (caseData.solution.motive.includes('greed') || caseData.solution.motive.includes('insurance') || caseData.solution.motive.includes('inheritance'))) {
+        response = `"${rand() > 0.5 ? 'My finances are stable enough.' : 'Money is always a concern, but I manage.'}" ${isDeceptive && rand() > 0.7 ? 'They seem reluctant to discuss details.' : subtleTells[Math.floor(rand() * subtleTells.length)]}`;
       } else {
-        response = `"${rand() > 0.5 ? 'I\'m doing fine financially. No complaints.' : 'Money isn\'t something I worry about much.'}" They seem ${isGuilty ? 'slightly defensive' : 'unbothered'} by the question.`;
+        // Innocent but finances might still be a sensitive topic
+        response = `"${rand() > 0.5 ? 'I\'d rather not discuss my personal finances, if that\'s alright.' : 'I get by. Nothing extraordinary.'}" ${subtleTells[Math.floor(rand() * subtleTells.length)]}`;
       }
       break;
 
     case 'whereabouts':
       if (isGuilty) {
-        response = `"During the ${suspect.alibiPhase}? ${suspect.alibi}" ${isDeceptive ? 'The account has suspicious gaps.' : 'They provide a detailed but unverifiable account.'} ${rand() > 0.5 ? '"You can check if you want."' : '"I don\'t have anyone who can confirm, unfortunately."'}`;
+        response = `"During the ${suspect.alibiPhase}? ${suspect.alibi}" ${isDeceptive && rand() > 0.7 ? 'The details are somewhat vague.' : subtleTells[Math.floor(rand() * subtleTells.length)]} ${rand() > 0.6 ? '"You can verify that if needed."' : ''}`;
       } else {
-        response = `"I was ${rand() > 0.5 ? 'at home' : 'out'} during that time. ${suspect.alibi}" They provide ${rand() > 0.5 ? 'a clear and consistent' : 'a straightforward'} account.`;
+        // Innocent but might not have a perfect alibi either
+        response = `"I was ${rand() > 0.5 ? 'going about my usual routine' : 'nothing out of the ordinary'}. ${suspect.alibi}" ${rand() > 0.4 ? 'They admit they don\'t have anyone who can confirm.' : subtleTells[Math.floor(rand() * subtleTells.length)]}`;
       }
       break;
 
@@ -405,18 +424,19 @@ export function generateInterviewResponse(
         const ev = caseData.evidence.find(e => e.id === evidenceId);
         if (ev) {
           if (ev.linkedSuspectId === suspect.id) {
-            if (isGuilty && isDeceptive) {
-              response = `"${ev.title}? I... I don't know anything about that." ${rand() > 0.5 ? 'Their voice wavers.' : 'They won\'t make eye contact.'} "You must have the wrong person."`;
+            if (isGuilty && isDeceptive && rand() > 0.5) {
+              response = `"${ev.title}? ${rand() > 0.5 ? 'I\'m not sure how that relates to me.' : 'That\'s interesting, but I don\'t see the connection.'}" ${subtleTells[Math.floor(rand() * subtleTells.length)]}`;
             } else if (isGuilty) {
-              response = `"I can see how that looks bad for me, but it's not what you think." They pause. "I was in the wrong place at the wrong time."`;
+              response = `"${rand() > 0.5 ? 'I can explain that.' : 'There\'s a reasonable explanation for that.'} ${rand() > 0.5 ? 'It\'s not as incriminating as it might appear.' : 'Context matters here.'}" ${subtleTells[Math.floor(rand() * subtleTells.length)]}`;
             } else {
-              response = `"${ev.title}? That's news to me. ${rand() > 0.5 ? 'I genuinely don\'t know how that connects to me.' : 'There must be some mistake.'}" They seem ${ev.isRedHerring ? 'confused but honest' : 'surprised'}.`;
+              // Innocent but evidence still links to them (red herring)
+              response = `"${ev.title}? ${rand() > 0.5 ? 'I genuinely don\'t understand how that involves me.' : 'I wasn\'t aware of that.'}" ${subtleTells[Math.floor(rand() * subtleTells.length)]}`;
             }
           } else {
-            response = `"I'm not sure what that has to do with me specifically. ${rand() > 0.5 ? 'You might want to ask someone else about that.' : 'That doesn\'t ring any bells.'}"`;
+            response = `"${rand() > 0.5 ? 'That doesn\'t concern me directly.' : 'I don\'t have much to say about that.'} ${rand() > 0.5 ? 'Perhaps someone else would know more.' : ''}" ${subtleTells[Math.floor(rand() * subtleTells.length)]}`;
           }
         } else {
-          response = `"I'm not familiar with what you're referring to." They look genuinely puzzled.`;
+          response = `"I'm not familiar with what you're referring to." ${subtleTells[Math.floor(rand() * subtleTells.length)]}`;
         }
       } else {
         response = `"What evidence are you referring to? You'll need to be more specific."`;

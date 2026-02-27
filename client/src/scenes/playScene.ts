@@ -194,10 +194,16 @@ function renderCreateLobby(container: HTMLElement): void {
     </div>
   `;
 
-  document.getElementById('btn-create-lobby')!.addEventListener('click', createLobbyAction);
+  const createBtn = document.getElementById('btn-create-lobby')!;
+  createBtn.addEventListener('click', createLobbyAction);
 }
 
 async function createLobbyAction(): Promise<void> {
+  const btn = document.getElementById('btn-create-lobby') as HTMLButtonElement;
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+  
   const data = {
     hostDisplayName: getDisplayName(),
     isPrivate: (document.getElementById('cl-private') as HTMLInputElement).checked,
@@ -221,11 +227,15 @@ async function createLobbyAction(): Promise<void> {
       } else if (msg.type === 'lobby:error') {
         unsub();
         showToast(msg.data.message);
+        btn.disabled = false;
+        btn.textContent = 'Create Lobby';
       }
     });
     net.createLobby(data);
   } catch {
     showToast('Could not connect to server.');
+    btn.disabled = false;
+    btn.textContent = 'Create Lobby';
   }
 }
 

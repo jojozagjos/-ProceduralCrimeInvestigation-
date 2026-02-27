@@ -239,8 +239,9 @@ async function handleMessage(client: ClientSocket, message: ClientMessage): Prom
       broadcastAll(lobbyId, { type: 'game:init', data: { gameState } });
       systemMessage(lobbyId, 'The case has begun!');
 
+      const speedFactor = 1.6; // Match client-side cinematic speed factor
       const totalCinematicMs = gameState.caseData.cinematicPanels
-        .reduce((sum, panel) => sum + panel.duration, 0);
+        .reduce((sum, panel) => sum + panel.duration * speedFactor, 0);
       scheduleCinematicEnd(lobbyId, totalCinematicMs);
 
       // Start time compression if enabled

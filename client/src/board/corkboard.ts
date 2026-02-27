@@ -232,16 +232,16 @@ function createRope(x1: number, y1: number, x2: number, y2: number, connectionId
   return { points, segments, length: totalLen / segments, fromCardId: fromId, toCardId: toId, connectionId };
 }
 
-function updateRope(rope: VerletRope, gravity = 0.3, damping = 0.98): void {
-  // Verlet integration
+function updateRope(rope: VerletRope, dt = 1, gravity = 0.3, damping = 0.98): void {
+  // Verlet integration with delta time normalization
   for (const p of rope.points) {
     if (p.pinned) continue;
-    const vx = (p.x - p.oldX) * damping;
-    const vy = (p.y - p.oldY) * damping;
+    const vx = (p.x - p.oldX) * Math.pow(damping, dt);
+    const vy = (p.y - p.oldY) * Math.pow(damping, dt);
     p.oldX = p.x;
     p.oldY = p.y;
-    p.x += vx;
-    p.y += vy + gravity;
+    p.x += vx * dt;
+    p.y += (vy + gravity * dt) * dt;
   }
 
   // Constraint solving
@@ -733,13 +733,16 @@ export function renderCorkboard(container: HTMLElement): void {
     const unsub = gameStore.subscribe(() => syncBoard());
     syncBoard();
 
-    let currentTextResolution = Math.min(8, Math.max(2, window.devicePixelRatio || 1));
+    let currentTextResolution = Math.min(12, Math.max(3, window.devicePixelRatio || 1));
 
     // Animation loop for ropes
-    app.ticker.add(() => {
+    app.ticker.add((delta) => {
+      // Normalize physics by delta time (60 FPS baseline)
+      const dt = delta / PIXI.Ticker.targetFPMS / 60;
+      
       const nextTextResolution = Math.min(
-        8,
-        Math.max(2, (window.devicePixelRatio || 1) / Math.max(0.3, boardContainer.scale.x))
+        12,
+        Math.max(3, (window.devicePixelRatio || 1) / Math.max(0.3, boardContainer.scale.x))
       );
       if (Math.abs(nextTextResolution - currentTextResolution) > 0.1) {
         currentTextResolution = nextTextResolution;
@@ -769,8 +772,8 @@ export function renderCorkboard(container: HTMLElement): void {
         
         if (elapsed < maxDuration) {
           // Normal physics - not floaty
-          const gravity = 0.5; // Normal gravity
-          const airResistance = 0.98; // Standard air resistance
+          const gravity = 0.5 * dt; // Normal gravity with delta time
+          const airResistance = Math.pow(0.98, dt); // Standard air resistance with delta time
           
           // Update velocity from previous position
           const vx = (sprite.x - physics.oldX) * airResistance;
@@ -780,14 +783,14 @@ export function renderCorkboard(container: HTMLElement): void {
           physics.oldY = sprite.y;
           
           // Apply physics (no wind)
-          sprite.x += vx;
-          sprite.y += vy + gravity;
+          sprite.x += vx * dt;
+          sprite.y += (vy + gravity) * dt;
           
           // Normal rotational physics
-          const rotationalDrag = 0.98;
-          physics.angularVelocity += (Math.random() - 0.5) * 0.01;
+          const rotationalDrag = Math.pow(0.98, dt);
+          physics.angularVelocity += (Math.random() - 0.5) * 0.01 * dt;
           physics.angularVelocity *= rotationalDrag;
-          physics.rotation += physics.angularVelocity;
+          physics.rotation += physics.angularVelocity * dt;
           sprite.rotation = physics.rotation;
           
           // Don't fade - keep at full opacity until removal
@@ -795,8 +798,8 @@ export function renderCorkboard(container: HTMLElement): void {
           // Update pin physics if it exists
           if (physics.pinPhysics) {
             const pin = physics.pinPhysics;
-            const pinGravity = 0.6; // Normal gravity for pin
-            const pinAirResistance = 0.98;
+            const pinGravity = 0.6 * dt; // Normal gravity for pin with delta time
+            const pinAirResistance = Math.pow(0.98, dt);
             
             const pvx = (pin.x - pin.oldX) * pinAirResistance;
             const pvy = (pin.y - pin.oldY) * pinAirResistance;
@@ -804,12 +807,12 @@ export function renderCorkboard(container: HTMLElement): void {
             pin.oldX = pin.x;
             pin.oldY = pin.y;
             
-            pin.x += pvx;
-            pin.y += pvy + pinGravity;
+            pin.x += pvx * dt;
+            pin.y += (pvy + pinGravity) * dt;
             
-            pin.vr += (Math.random() - 0.5) * 0.015;
-            pin.vr *= 0.98;
-            pin.rotation += pin.vr;
+            pin.vr += (Math.random() - 0.5) * 0.015 * dt;
+            pin.vr *= Math.pow(0.98, dt);
+            pin.rotation += pin.vr * dt;
           }
         } else {
           // Animation complete - remove card
@@ -825,7 +828,7 @@ export function renderCorkboard(container: HTMLElement): void {
       
       // Lerp to target position for smooth remote drag updates
       if (physics.targetX !== undefined && physics.targetY !== undefined) {
-        const lerpFactor = 0.3; // Smooth interpolation
+        const lerpFactor = Math.min(0.5 * dt, 1); // Faster interpolation with delta time, capped at 1
         sprite.x += (physics.targetX - sprite.x) * lerpFactor;
         sprite.y += (physics.targetY - sprite.y) * lerpFactor;
         
@@ -857,8 +860,8 @@ export function renderCorkboard(container: HTMLElement): void {
         const maxDuration = 4000;
         
         if (elapsed < maxDuration) {
-          const gravity = 0.4;
-          const airResistance = 0.98;
+          const gravity = 0.4 * dt;
+          const airResistance = Math.pow(0.98, dt);
           
           const vx = (physics.x - physics.oldX) * airResistance;
           const vy = (physics.y - physics.oldY) * airResistance;
@@ -866,16 +869,16 @@ export function renderCorkboard(container: HTMLElement): void {
           physics.oldX = physics.x;
           physics.oldY = physics.y;
           
-          physics.x += vx;
-          physics.y += vy + gravity;
+          physics.x += vx * dt;
+          physics.y += (vy + gravity) * dt;
           
           sprite.x = physics.x;
           sprite.y = physics.y;
           
           // Subtle rotation as it falls
-          physics.vr += (Math.random() - 0.5) * 0.008;
-          physics.vr *= 0.98;
-          physics.rotation += physics.vr;
+          physics.vr += (Math.random() - 0.5) * 0.008 * dt;
+          physics.vr *= Math.pow(0.98, dt);
+          physics.rotation += physics.vr * dt;
           sprite.rotation = (physics.rotation * Math.PI) / 180;
           
           // Don't fade - keep at full opacity until removal
@@ -887,7 +890,7 @@ export function renderCorkboard(container: HTMLElement): void {
       } else {
         // Lerp to target position for smooth remote drag updates
         if (physics.targetX !== undefined && physics.targetY !== undefined) {
-          const lerpFactor = 0.3; // Smooth interpolation
+          const lerpFactor = Math.min(0.5 * dt, 1); // Faster interpolation with delta time, capped at 1
           sprite.x += (physics.targetX - sprite.x) * lerpFactor;
           sprite.y += (physics.targetY - sprite.y) * lerpFactor;
           
@@ -933,7 +936,7 @@ export function renderCorkboard(container: HTMLElement): void {
           continue;
         }
       }
-      updateRope(rope);
+      updateRope(rope, dt);
 
       // Draw rope with fading only at the very end
       let ropeAlpha = 0.9;
@@ -1068,7 +1071,7 @@ function buildTapeTextSprite(tape: BoardTape, item: NoteTextItem): PIXI.Text {
     wordWrapWidth: (TAPE_W - 4) / scaleX,
   });
   const text = new PIXI.Text(item.text.slice(0, 50), style);
-  text.resolution = Math.min(8, Math.max(2, window.devicePixelRatio || 1));
+  text.resolution = Math.min(12, Math.max(3, window.devicePixelRatio || 1));
   text.name = `tape-text:${item.id}`;
   text.anchor.set(0, 0);
   text.x = (item.x - TAPE_CANVAS_W / 2) * scaleX;
@@ -1690,10 +1693,11 @@ function updateCardSprite(container: PIXI.Container, card: BoardCard): void {
       fill: '#5a3a1a',
     }));
     tagLabel.name = 'note-tag-label';
-    tagLabel.x = 6;
-    tagLabel.y = CARD_H - 14;
+    tagLabel.anchor.set(1, 0); // Anchor to top-right
+    tagLabel.x = CARD_W - 6; // Position at right edge with padding
+    tagLabel.y = 6; // Position at top with padding
     container.addChild(tagLabel);
-    tagLabel.resolution = Math.min(8, Math.max(2, window.devicePixelRatio || 1));
+    tagLabel.resolution = Math.min(12, Math.max(3, window.devicePixelRatio || 1));
   }
 }
 
@@ -2576,16 +2580,16 @@ function openCardEditor(card: BoardCard): void {
     isDrawing = true; 
     currentStroke.length = 0;
     const rect = drawCanvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = Math.max(0, Math.min(drawCanvas.width, e.clientX - rect.left));
+    const y = Math.max(0, Math.min(drawCanvas.height, e.clientY - rect.top));
     currentStroke.push({ x, y });
   });
   
   drawCanvas.addEventListener('mousemove', (e) => {
     if (!isDrawing) return;
     const rect = drawCanvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = Math.max(0, Math.min(drawCanvas.width, e.clientX - rect.left));
+    const y = Math.max(0, Math.min(drawCanvas.height, e.clientY - rect.top));
     currentStroke.push({ x, y });
 
     if (drawMode === 'pen') {
@@ -3129,16 +3133,16 @@ function openTapeEditor(tape: BoardTape): void {
     isDrawing = true;
     currentStroke.length = 0;
     const rect = drawCanvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = Math.max(0, Math.min(drawCanvas.width, e.clientX - rect.left));
+    const y = Math.max(0, Math.min(drawCanvas.height, e.clientY - rect.top));
     currentStroke.push({ x, y });
   });
 
   drawCanvas.addEventListener('mousemove', (e) => {
     if (!isDrawing) return;
     const rect = drawCanvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = Math.max(0, Math.min(drawCanvas.width, e.clientX - rect.left));
+    const y = Math.max(0, Math.min(drawCanvas.height, e.clientY - rect.top));
     currentStroke.push({ x, y });
 
     if (drawMode === 'pen') {
